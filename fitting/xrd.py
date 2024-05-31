@@ -165,7 +165,7 @@ class Hexagonal:
         print(f"strain = ({fit.x[2]:.6f} \u00B1 {std[3]:.6f})")
 
         if fit.x[2] < std[2]:
-            print("Strain is negative or less than it's uncertainty. Rejecting this fit and locking strain to 0.")
+            print("Strain is negative or less than its uncertainty. Rejecting this fit and locking strain to 0.")
             self.strain_lock = True
         else:
             self.report_fit(fit)
