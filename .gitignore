@@ -50,3 +50,7 @@ package.nls.*.json
 l10n/
 native_locator/target/**
 native_locator/Cargo.lock
+fitting.egg-info/dependency_links.txt
+build/lib/fitting/__init__.py
+/build
+/fitting.egg-info
