@@ -22,7 +22,8 @@ class NewBackground(Background):
 
 class Hexagonal:
 
-    def __init__(self, a, c, q, counts, name, weights=None, wavelength=1.54185, background="new", det_dist=150):
+    def __init__(self, a: float, c: float, q: np.ndarray, counts: np.ndarray,
+                 name: str, weights:np.ndarray=None, wavelength:float=1.54185, background:str="new", det_dist:float=150.0):
         self.free_param_num = 0
         self.wavelength = wavelength
         self.q = q
