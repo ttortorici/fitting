@@ -412,8 +412,7 @@ class Hexagonal:
         return np.sum(bkgd_heights * np.exp(-0.5 * arg * arg), axis=0)
     
     def show_data(self):
-        plt.figure(figsize=(3.5, 3))
-        ax = plt.subplot()
+        fig, ax = plt.subplots(1, 1, figsize=(3.5, 3))
         ax.scatter(
             self.q, self.counts,
             s=5,  # marker size
@@ -428,14 +427,16 @@ class Hexagonal:
         ax.set_ylabel("Counts")
         ax.set_yscale("log")
         ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+        ax.tick_params(axis="both", which="both", direction="in", top=True, right=True)
         ax.grid()
-        plt.tight_layout()
+        fig.tight_layout()
+        return fig, ax
     
     def show_fit(self):
         fit = self.fitting_function(self.a, self.c, self.w0, self.peak_heights, self.grain_size, self.voight, self.strain,
                                     self.goniometer_offset, self.det_dist, self.bkgd_heights, self.bkgd_const, self.bkgd_lin)
-        self.show_data()
-        plt.plot(self.q, fit, label="Fit", color="red", lw="0.5")
+        fig, ax = self.show_data()
+        ax.plot(self.q, fit, label="Fit", color="red", lw="0.5")
     
     def set_range(self, q_min, q_max, q_buffer=1.0):
         self.q_min = q_min
