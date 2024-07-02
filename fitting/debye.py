@@ -21,12 +21,16 @@ class Debye:
             self.colors_f = ["r", "r", "k"]
         else:
             self.colors_d = ["k", "darkgreen", "turquoise", "b", "slateblue", "darkviolet", "r"]
-            self.colors_f = ["r", "r", "r", "r", "k", "k", "k"]
+            self.colors_f = ["r", "r", "r", "r", "r", "r", "k"]
         
-        self.frequencies = data.frequencies
-        self.angular_frquency = np.array(self.frequencies) * 2 * np.pi
         self.reverse = data.reverse
+        if self.reverse:
+            self.colors_d = self.colors_d[::-1]
+            self.colors_f = self.colors_f[::-1]
 
+        self.frequencies = data.frequencies
+        self.angular_frequency = np.array(self.frequencies) * 2 * np.pi
+        
         if calibration_data is not None:
             calibration = Bare(calibration_data)
             calibration.fit()
@@ -47,21 +51,54 @@ class Debye:
             [np.linspace(self.temperature.min()-10, self.temperature.max()+10, 1000)] * self.freq_num
         ).T
         
-    def initialize_fit(self, num_peaks: int, num_relax_times: int):
-        self.num_peaks = num_peaks
-        self.num_relax_times = num_relax_times
-        self.relaxation_times = np.arange(num_relax_times, dtype=np.float64).reshape((1, 1, num_relax_times, 1, 1)) * 1.0
-        self.t = -30 * np.ones((1, num_peaks, 1, 1), dtype=np.float64)
-        self.relaxation_step = np.arange(num_peaks, dtype=np.float64).reshape((1, num_peaks, 1, 1)) * 80.0 + 40.0
-        self.relaxation_step[-1] = 2.5e-5
-        self.activation_energy = np.arange(num_peaks, dtype=np.float64).reshape((1, num_peaks, 1, 1)) * 3.0 + 700.0
-        self.amplitude = np.ones((num_relax_times, num_peaks, 1, 1), dtype=np.float64)
-        self.multiple_relaxation = np.arange(self.num_relax_times).reshape((num_relax_times, 1, 1, 1)) - int(self.num_relax_times / 2)
-
     @staticmethod
-    def susceptibility_noninteracting(temperature, coupling_energy):
+    def susceptibility_noninteracting(temperature: np.ndarray, coupling_energy: float):
         sech = 1.0 / np.cosh(coupling_energy / (2.0 * temperature))
         return sech * sech
+    
+    @staticmethod
+    def susceptibility_antiferroelectric(temperature: np.ndarray, coupling_energy: float):
+        return 3 / (2 + np.exp(1.5 * coupling_energy / temperature))
+    
+    @staticmethod
+    def susceptibility_ferrielectric(temperature: np.ndarray, coupling_energy: float):
+        exp = np.exp(1.5 * coupling_energy / temperature)
+        return (2 + exp) / (1 + 2 * exp)
+
+    def show_data(self, film=True):
+        
+        fig, axes = plt.subplots(2, 1, figsize=(4, 9))
+        axes[0].set_title(self.name)
+        for ax in axes:
+            ax.grid(linestyle='dotted')
+            ax.set_xlabel('Temperature (K)')
+            ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+            ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+            ax.tick_params(axis="both", which="both", direction="in", top=True, right=True)
+        
+        if film:
+            axes[0].set_ylabel("$\\chi'$")
+            axes[1].set_ylabel("$\\chi''$")
+        else:
+            axes[0].set_ylabel("Capacitance (pF)")
+            axes[1].set_ylabel("$\\tan\\delta$")
+
+        for ii in range(self.freq_num):
+            if self.reverse:
+                ii = self.freq_num - ii - 1
+            freq_name = str(int(self.frequencies[ii]))
+            if len(freq_name) > 3:
+                freq_name = freq_name[:-3] + " kHz"
+            else:
+                freq_name += " Hz"
+            ax[0].scatter(self.data[:, ii], self.data[:, ii], s=4, marker="o",
+                          edgecolors=self.colors[ii], lw=.75, alpha=1, facecolor='w',
+                          label=freq_name)
+            ax[1].scatter(self.data[:, ii], self.data[:, ii], s=4, marker="o",
+                          edgecolors=self.colors[ii], lw=.75, alpha=1, facecolor='w')
+
+        fig.tight_layout()
+        return fig, axes
 
 
 class Debye33(Debye):
