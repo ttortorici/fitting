@@ -47,7 +47,7 @@ class Debye:
         self.losstangent = data.get_losses()
         
         self.temperature_fit = np.stack(
-            [np.linspace(self.temperature.min()-10, self.temperature.max()+10, 1000)] * self.freq_num
+            [np.linspace(self.temperature.min(), self.temperature.max(), 1000)] * self.freq_num
         ).T
         
     @staticmethod
@@ -90,79 +90,18 @@ class Debye:
                 freq_name = freq_name[:-3] + " kHz"
             else:
                 freq_name += " Hz"
-            ax[0].scatter(self.data[:, ii], self.data[:, ii], s=4, marker="o",
-                          edgecolors=self.colors[ii], lw=.75, alpha=1, facecolor='w',
-                          label=freq_name)
-            ax[1].scatter(self.data[:, ii], self.data[:, ii], s=4, marker="o",
-                          edgecolors=self.colors[ii], lw=.75, alpha=1, facecolor='w')
+            axes[0].scatter(self.temperature[:, ii], self.capacitance[:, ii], s=4, marker="o",
+                            edgecolors=self.colors_d[ii], lw=.75, alpha=1, facecolor='w',
+                            label=freq_name)
+            axes[1].scatter(self.temperature[:, ii], self.losstangent[:, ii], s=4, marker="o",
+                            edgecolors=self.colors_d[ii], lw=.75, alpha=1, facecolor='w')
 
         fig.tight_layout()
         return fig, axes
 
-
-class Debye33(Debye):
-
-    def initialize_fit(self):
-        self.emat0 = 3.3
-        self.emat1 = 3.7e-4
-        self.td0 = 1e-5
-        self.td1 = 0.0
-        self.td2 = 0.0
-        self.num_peaks = 3
-        self.num_relax_times = 11
-        self.curie_temperature = 0.0
-        self.ln_attempt_time = -30.0
-        self.activation_energy1 = 700.0
-        self.activation_energy2 = 1400.0
-        self.activation_energy3 = 1700.0
-        self.coupling_energy1 = 0
-        self.coupling_energy2 = 0
-        self.coupling_energy3 = 0
-        self.populations1 = np.zeros((self.num_relax_times, 1, 1), dtype=np.float64)
-        self.populations2 = np.zeros((self.num_relax_times, 1, 1), dtype=np.float64)
-        self.populations1[5, 1, 1] = 1.0        # 5 is the center
-        self.populations2[5, 1, 1] = 1.0        # 5 is the center
-        self.populations3 = 1.0
-        self.peak_width1 = 50.0
-        self.peak_width2 = 50.0
-    
-    @classmethod
-    def fitting_function(cls, temperature: np.ndarray, angular_frequency, curie_temperature: float, ln_attempt_time: float,
-                         activation_energy1: float, activation_energy2: float, activation_energy3: float,
-                         coupling_energy1: float, coupling_energy2: float, coupling_energy3: float,
-                         populations1: np.ndarray, populations2: np.ndarray, populations3: float,
-                         peak_width1: float, peak_width2: float, emat0: float, emat1: float,
-                         bare0: float, bare1: float, bare2: float, 
-                         td0: float, td1: float, td2: float):
-        offsets = np.linspace(-5, 5, 11).reshape((11, 1, 1))
-        tau1 = np.exp(ln_attempt_time + (activation_energy1 + offsets * peak_width1) / temperature)     # shape (num_relax_times, 1, 1)
-        tau2 = np.exp(ln_attempt_time + (activation_energy2 + offsets * peak_width2) / temperature)     # shape (num_relax_times, 1, 1)
-        tau3 = np.exp(ln_attempt_time + (activation_energy3) / temperature)
-
-        temperature_300 = temperature - 300.0
-        temperature_curie_inv = 1. / (temperature - curie_temperature)
-        omega_tau1 = angular_frequency * tau1
-        omega_tau2 = angular_frequency * tau2
-        omega_tau3 = angular_frequency * tau3
-
-        bare_capacitance = bare0 + bare1 * temperature_300 + bare2 * temperature_300 * temperature_300
-        bare_loss = td0 + td1 * temperature + td2 * temperature * temperature
-        real1 = populations1 * cls.susceptibility_noninteracting(temperature, coupling_energy1) / (1.0 + omega_tau1 * omega_tau1) * temperature_curie_inv
-        real2 = populations2 * cls.susceptibility_noninteracting(temperature, coupling_energy2) / (1.0 + omega_tau2 * omega_tau2) * temperature_curie_inv
-        real3 = populations3 * cls.susceptibility_noninteracting(temperature, coupling_energy3) / (1.0 + omega_tau3 * omega_tau3) * temperature_curie_inv
-        imag1 = real1 * omega_tau1
-        imag2 = real2 * omega_tau2
-        imag3 = real3 * omega_tau3
-
-        geometric_factor = bare0 / 4.8
-
-        capacitance = bare_capacitance + geometric_factor * (emat0 - 1) + emat1 * temperature_300 + np.sum(real1, axis=0) + np.sum(real2, axis=0) + real3
-        loss = bare_loss + geometric_factor * (np.sum(imag1, axis=0) + np.sum(imag2, axis=0) + imag3)
-        
-        return capacitance, loss
     
     
-    
+
 
 
 class Film:

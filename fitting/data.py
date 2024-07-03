@@ -20,16 +20,20 @@ class DataSet:
 
     def __init__(self, files, name=""):
         if isinstance(files, Path) or isinstance(files, str):
-            self.data = DataSet.loadtxt(files)
+            self.data = self.loadtxt(files)
         elif isinstance(files, list) or isinstance(files, tuple):
-            self.data = DataSet.loadtxt(files[0])
+            self.data = self.loadtxt(files[0])
             for file in files[1:]:
-                self.data = np.concatenate((self.data, DataSet.loadtxt(file)), axis=0)
+                self.data = np.concatenate((self.data, self.loadtxt(file)), axis=0)
         self.shape = self.data.shape
         self.name = name
+        print(f"Loaded data with shape: {self.shape}.")
 
-        self.freq_num = int(self.shape[1] / DataSet.COLS_PER)
-        self.frequencies = [self.data[0, index] for index in self.get_inds(DataSet.FREQ_IND)]
+        self.freq_num = int(self.shape[1] / self.COLS_PER)
+        self.frequencies = [self.data[0, index] for index in self.get_inds(self.FREQ_IND)]
+
+        print(f"{tuple(self.frequencies)} frequencies found")
+        
         if self.frequencies[0] > self.frequencies[-1]:
             self.reverse = True
         else:
@@ -40,27 +44,27 @@ class DataSet:
         return self.frequencies
 
     def get_inds(self, col_ind):
-        return [col_ind + DataSet.COLS_PER * ii for ii in range(self.freq_num)]
+        return [col_ind + self.COLS_PER * ii for ii in range(self.freq_num)]
     
     def get_times(self):
-        times_inds = self.get_inds(DataSet.TIME_IND)
+        times_inds = self.get_inds(self.TIME_IND)
         return self.data[:, times_inds]
     
     def get_temperatures(self):
-        temperature_inds = self.get_inds(DataSet.TMPA_IND)
+        temperature_inds = self.get_inds(self.TMPA_IND)
         return self.data[:, temperature_inds]
     
     def get_capacitances(self):
-        capacitance_inds = self.get_inds(DataSet.CAPT_IND)
+        capacitance_inds = self.get_inds(self.CAPT_IND)
         return self.data[:, capacitance_inds]
     
     def get_losses(self):
-        loss_inds = self.get_inds(DataSet.LOSS_IND)
+        loss_inds = self.get_inds(self.LOSS_IND)
         return self.data[:, loss_inds]
     
     def time_derivative_filter(self):
-        time_inds = self.get_inds(DataSet.TIME_IND)
-        temp_inds = self.get_inds(DataSet.TMPA_IND)
+        time_inds = self.get_inds(self.TIME_IND)
+        temp_inds = self.get_inds(self.TMPA_IND)
         derivative =  (self.data[1:, temp_inds] - self.data[:-1, temp_inds]) / (self.data[1:, time_inds] - self.data[:-1, time_inds])
 
         not_flat = np.ones(derivative.shape, dtype=bool)
@@ -143,6 +147,17 @@ class DataSet:
         axim.tick_params(axis="both", which="both", direction="in", top=True, right=True)
         fig.tight_layout()
         return fig, (axre, axim)
+
+
+class DataSetOld(DataSet):
+    TIME_IND = 0
+    TMPA_IND = 1
+    TMPB_IND = 2
+    FREQ_IND = 3
+    CAPT_IND = 4
+    LOSS_IND = 5
+    COLS_PER = 6
+
 
 def reverse_freqs_in_data_set(file: Path):
     data_set = DataSet(file)
