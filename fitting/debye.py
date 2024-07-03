@@ -1,7 +1,6 @@
-from data import DataSet
-from bare import Bare
+from fitting.data import DataSet
+from fitting.bare import Bare
 import numpy as np
-from itertools import product
 from scipy.optimize import least_squares
 import matplotlib.pylab as plt
 import matplotlib

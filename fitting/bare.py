@@ -1,4 +1,4 @@
-from data import DataSet
+from fitting.data import DataSet
 import numpy as np
 from scipy.optimize import least_squares
 import matplotlib.pylab as plt
