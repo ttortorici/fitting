@@ -45,10 +45,34 @@ class Debye:
         self.temperature = data.get_temperatures()
         self.capacitance = data.get_capacitances()
         self.losstangent = data.get_losses()
+        self.imaginary_capacitance = self.capacitance * self.losstangent
         
         self.temperature_fit = np.stack(
             [np.linspace(self.temperature.min(), self.temperature.max(), 1000)] * self.freq_num
         ).T
+
+    def report_fit(self, fit):
+        data_points = np.product(self.capacitance.shape) * 2
+        dof = data_points - len(fit.x)
+        reduced_chi_sq = 2 * fit.cost / dof
+        print(f"Reduced chi-squared: {reduced_chi_sq:.3f}")
+        print(f"message: {fit.message}")
+        print(f"Number of function evaluations: {fit.nfev}")
+        print(f"Number of Jacobian evaluations: {fit.njev}\n")
+
+    @staticmethod
+    def convert_energy(temperature, units):
+        if units.lower() == "kcal":
+            kB = 0.001987          # energy in kcal/mol
+        elif units.lower() == "k":
+            kB = 1.0               # energy in K
+        elif units.lower() == "j":
+            kB = 1.38064852e-23    # energy in J
+        elif units.lower() == "ev":
+            kB = 0.000086173303    # energy in eV
+        else:
+            raise ValueError("Energy units not recognized.")
+        return temperature * kB
         
     @staticmethod
     def susceptibility_noninteracting(temperature: np.ndarray, coupling_energy: float):
@@ -80,7 +104,7 @@ class Debye:
             axes[1].set_ylabel("$\\chi''$")
         else:
             axes[0].set_ylabel("Capacitance (pF)")
-            axes[1].set_ylabel("$\\tan\\delta$")
+            axes[1].set_ylabel("$C''$ (pF)")
 
         for ii in range(self.freq_num):
             if self.reverse:
@@ -93,7 +117,7 @@ class Debye:
             axes[0].scatter(self.temperature[:, ii], self.capacitance[:, ii], s=4, marker="o",
                             edgecolors=self.colors_d[ii], lw=.75, alpha=1, facecolor='w',
                             label=freq_name)
-            axes[1].scatter(self.temperature[:, ii], self.losstangent[:, ii], s=4, marker="o",
+            axes[1].scatter(self.temperature[:, ii], self.imaginary_capacitance[:, ii], s=4, marker="o",
                             edgecolors=self.colors_d[ii], lw=.75, alpha=1, facecolor='w')
 
         fig.tight_layout()
