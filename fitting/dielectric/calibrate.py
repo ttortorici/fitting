@@ -19,36 +19,56 @@ superscript = ["\u2070", "\u00B9", "\u00B2", "\u00B3", "\u2074",
 
 
 class Bare:
-    def __init__(self):
+    def __init__(self, data_file: Path):
         self.time = None
         self.temp = None
         self.caps = None
         self.loss = None
         self.freq = None
         self.fnum = None
+        self.real_order = None
+        self.imag_order = None
         self._fit_real = None
         self._fit_imag = None
+        self._dof_real = None
+        self._dof_imag = None
+        self._red_chi_sq_real = None
+        self._red_chi_sq_imag = None
+        # dof = len(self.counts) - len(fit.x)
+        # reduced_chi_sq = 2 * fit.cost / dof
+        self.load_bare(data_file)
+    
+    def fit(self, real_order, imag_order):
+        self.fit_real(real_order)
+        self.fit_imag(imag_order)
+        self.show_fit()
     
     def fit_real(self, poly_order: int, room_temperature_measurement: float=1.2):
         if self.time is None:
             raise AttributeError("Need to load data first with .load_bare(file)")
+        self.real_order = poly_order
         initial_params = [room_temperature_measurement] * self.fnum
-        initial_params.extend(list(np.logspace(-3, -3-poly_order, poly_order - 1)))
+        initial_params.extend(list(np.logspace(-3, -3-poly_order, poly_order)))
 
         fit_result = least_squares(self.residuals_real, initial_params, args=(self.temp, self.caps), method="lm")
-        print("Capacitance Fit")
+        self._dof_real = self.caps.size - len(fit_result.x)
+        self._red_chi_sq_real = 2. * fit_result.cost / self._dof_real
+        print(f"Capacitance Fit: reduced chi^2 = {self._red_chi_sq_real}")
         print(fit_result)
         self._fit_real = fit_result.x
         
     def fit_imag(self, poly_order: int, room_temperature_measurement: float = 1e-5):
         if self.time is None:
             raise AttributeError("Need to load data first with .load_bare(file)")
+        self.imag_order = poly_order
         initial_params = [room_temperature_measurement] * (2 * self.fnum)
         initial_params.extend([5] * self.fnum)
-        initial_params.extend(list(np.logspace(-8, -8-poly_order, poly_order - 1)))
+        initial_params.extend(list(np.logspace(-8, -8-poly_order, poly_order)))
 
         fit_result = least_squares(self.residuals_imag, initial_params, args=(self.temp, self.loss), method="lm")
-        print("Loss Fit")
+        self._dof_imag = self.loss.size - len(fit_result.x)
+        self._red_chi_sq_imag = 2. * fit_result.cost / self._dof_imag
+        print(f"\nLoss Fit: reduced chi^2 = {self._red_chi_sq_imag}")
         print(fit_result)
         self._fit_imag = fit_result.x
 
@@ -127,32 +147,33 @@ class Bare:
         self.fnum = dataset.freq_num
 
     def show_fit(self):
+        fig, axes = plt.subplots(2, 1, figsize=(6, 8))
         x = np.linspace(4, 400, 10000)
         x = np.dstack([x] * self.temp.shape[1])[0]
-        fit_to_plot = fit_function_cap(fit_result_cap.x, x)
-        fig, ax = plt.subplots(1, 1)
-        for ii in range(dataset.freq_num):
-            ax.plot(temp[:, ii], caps[:, ii], "x")
-            ax.plot(x, fit_to_plot[:, ii])
-        ax.grid(linestyle='dotted')
-        ax.set_xlabel('Temperature (K)')
-        ax.set_ylabel('Capacitance (pF)')
-        ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
-        ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
-        ax.tick_params(axis="both", which="both", direction="in", top=True, right=True)
-        fig.tight_layout()
 
-        fig, ax = plt.subplots(1, 1)
-        fit_to_plot = fit_function_los(fit_result_los.x, x)
-        for ii in range(dataset.freq_num):
-            ax.plot(temp[:, ii], loss[:, ii], "x")
-            ax.plot(x, fit_to_plot[:, ii])
-        ax.grid(linestyle='dotted')
-        ax.set_xlabel('Temperature (K)')
-        ax.set_ylabel('Loss Tangent')
-        ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
-        ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
-        ax.tick_params(axis="both", which="both", direction="in", top=True, right=True)
+        fit_to_plot = self.fit_function_real(self._fit_real, x)
+        for ii in range(self.fnum):
+            axes[0].plot(self.temp[:, ii], self.caps[:, ii], "x")
+            axes[0].plot(x, fit_to_plot[:, ii])
+        
+        fit_to_plot = self.fit_function_imag(self._fit_imag, x)
+        for ii in range(self.fnum):
+            axes[1].plot(self.temp[:, ii], self.loss[:, ii], "x")
+            axes[1].plot(x, fit_to_plot[:, ii])
+
+        for ax in axes:
+            ax.grid(linestyle='dotted')
+            ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+            ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+            ax.tick_params(axis="both", which="both", direction="in", top=True, right=True)
+        axes[0].set_ylabel('Capacitance (pF)')
+        axes[1].set_ylabel('Loss Tangent')
+        axes[1].set_xlabel('Temperature (K)')
+
+        real_text = f"polynomial order = {self.real_order}"
+        imag_text = f"polynomial order = {self.imag_order}"
+        axes[0].text(4, self.caps.max() * 0.9 + self.caps.min() * 0.1, real_text, ha="left")
+        axes[1].text(0.9, 0.9, imag_text, ha="right", transform=ax.transAxes)
         fig.tight_layout()
 
 
@@ -327,8 +348,12 @@ if __name__ == "__main__":
 
     # dir = Path("C:\\Users\\Teddy\\OneDrive - UCB-O365\\Rogerslab3\\Teddy\\TPP Films\\BTB-TPP\\2024 Film Growth\\Film 2\\BDS\\00 - Cals")
     # file = dir / "2024-02-29__none__M09-1-TT501__CAL__T-13-39_rev-freq.csv"
-    file = Path(r"C:\Users\Teddy\OneDrive - UCB-O365\Rogerslab3\Teddy\TPP Films\BAP-TPP\Film 20241014\Dielectric\2024-10-11__bare__M01-2__CAL__T-12-16.csv")
-    fit_cap(file)  #, 300, 200)
+
+    # file = Path(r"C:\Users\Teddy\OneDrive - UCB-O365\Rogerslab3\Teddy\TPP Films\BAP-TPP\Film 20241014\Dielectric\2024-10-11__bare__M01-2__CAL__T-12-16.csv")
+    file = Path(r"H:\OneDrive - UCB-O365\Rogerslab3\Teddy\TPP Films\BAP-TPP\Film 20241014\Dielectric\2024-10-11__bare__M01-2__CAL__T-12-16.csv")
+    bare = Bare(file)
+    bare.fit(real_order=5, imag_order=2)
+    #fit_cap(file)  #, 300, 200)
     plt.show()
     # print(data.data)
     # print(data.shape)
