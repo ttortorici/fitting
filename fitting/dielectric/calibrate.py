@@ -1,379 +1,155 @@
-from scipy.optimize import least_squares
-from scipy.special import erf
+from fitting.dielectric.bare import Bare
+from fitting.dielectric.load import RawData, ProcessedFile, ProcessedFileLite
+import fitting.capacitor as capacitor
 from pathlib import Path
-from fitting.dielectric.load import DataSet
 import numpy as np
-import matplotlib.pylab as plt
-import matplotlib
-matplotlib.rcParams['mathtext.fontset'] = 'stix'
-matplotlib.rcParams['font.family'] = 'STIXGeneral'
 
 
-root2pi_inv = 1. / np.sqrt(2.0 * np.pi)
-max_nfev = 1 # iterate one at a time
+class Calibrate:
 
-subscript = ["\u2080", "\u2081", "\u2082", "\u2083", "\u2084",
-             "\u2085", "\u2086", "\u2087", "\u2088", "\u2089"]
-superscript = ["\u2070", "\u00B9", "\u00B2", "\u00B3", "\u2074",
-               "\u2075", "\u2076", "\u2077", "\u2078", "\u2079"]
+    def __init__(self, film_data_file: Path):
+        if isinstance(film_data_file, Path):
+            self.dir = film_data_file.parent
+            self.name = film_data_file.stem
+        else:
+            self.dir = film_data_file[0].parent
+            self.name = film_data_file[0].stem
+        self.bare_cap_curve = None      # will be a 2D array of size (data_points, frequency_num)
+        self.bare_loss_curve = None     # will be a 2D array of size (data_points, frequency_num)
+        self.bare_cap_std = None        # will be a 1D array of length frequency_num
+        self.bare_loss_std = None       # will be a 1D array of length frequency_num
+        self.raw_data = RawData(film_data_file)
 
+    def load_calibration(self, file: Path, real_poly_order: int, imaginary_poly_order: int):
+        bare = Bare(file)
+        bare.fit(real_order=real_poly_order, imag_order=imaginary_poly_order)
+        bare.show_fit()
+        temperature = self.raw_data.get_temperatures()
+        self.bare_cap_curve = bare.fit_function_real(bare._fit_real, temperature)
+        self.bare_loss_curve = bare.fit_function_imag(bare._fit_imag, temperature)
+        self.bare_cap_dev = bare.standard_dev_real
+        self.bare_loss_dev = bare.standard_dev_imag
 
-class Bare:
-    def __init__(self, data_file: Path):
-        self.time = None
-        self.temp = None
-        self.caps = None
-        self.loss = None
-        self.freq = None
-        self.fnum = None
-        self.real_order = None
-        self.imag_order = None
-        self._fit_real = None
-        self._fit_imag = None
-        self._dof_real = None
-        self._dof_imag = None
-        self._red_chi_sq_real = None
-        self._red_chi_sq_imag = None
-        # dof = len(self.counts) - len(fit.x)
-        # reduced_chi_sq = 2 * fit.cost / dof
-        self.load_bare(data_file)
-    
-    def fit(self, real_order, imag_order):
-        self.fit_real(real_order)
-        self.fit_imag(imag_order)
-        self.show_fit()
-    
-    def fit_real(self, poly_order: int, room_temperature_measurement: float=1.2):
-        if self.time is None:
-            raise AttributeError("Need to load data first with .load_bare(file)")
-        self.real_order = poly_order
-        initial_params = [room_temperature_measurement] * self.fnum
-        initial_params.extend(list(np.logspace(-3, -3-poly_order, poly_order)))
+    def run(self, film_thickness: float, gap_width: float, finger_num: int=50, gap_err: float=0,
+            film_thickness_err: float=0, finger_length_err: float=0, parallel_plate: bool=False):
+        data_pts = self.raw_data.shape[0]       # number of rows
+        print(f"num data: {data_pts}")
+        time = self.raw_data.get_times()
+        temp = self.raw_data.get_temperatures()
+        tempb = self.raw_data.get_shield_temperatures()
+        caps = self.raw_data.get_capacitances()
 
-        fit_result = least_squares(self.residuals_real, initial_params, args=(self.temp, self.caps), method="lm")
-        self._dof_real = self.caps.size - len(fit_result.x)
-        self._red_chi_sq_real = 2. * fit_result.cost / self._dof_real
-        print(f"Capacitance Fit: reduced chi^2 = {self._red_chi_sq_real}")
-        print(fit_result)
-        self._fit_real = fit_result.x
+        loss = self.raw_data.get_losses()
+        volt = self.raw_data.get_voltages()
+        cap_imag = caps * loss
+        cap_bare_imag = self.bare_cap_curve * self.bare_loss_curve
+        cap_err_imag = np.sqrt((self.raw_data.cap_std * loss)**2 + (self.raw_data.loss_std * caps)**2)
+        cap_err_bare_imag = np.sqrt((self.bare_cap_dev * self.bare_loss_curve)**2 + (self.bare_loss_dev * self.bare_cap_curve)**2)
+        del_cap_err_real = np.sqrt(self.raw_data.cap_std * self.raw_data.cap_std + self.bare_cap_dev * self.bare_cap_dev)
+        del_cap_err_imag = np.sqrt(cap_err_imag * cap_err_imag + cap_err_bare_imag * cap_err_bare_imag)
         
-    def fit_imag(self, poly_order: int, room_temperature_measurement: float = 1e-5):
-        if self.time is None:
-            raise AttributeError("Need to load data first with .load_bare(file)")
-        self.imag_order = poly_order
-        initial_params = [room_temperature_measurement] * (2 * self.fnum)
-        initial_params.extend([5] * self.fnum)
-        initial_params.extend(list(np.logspace(-8, -8-poly_order, poly_order)))
+        del_cap_real = (caps - self.bare_cap_curve) * 1000.     # fF
+        del_cap_imag = (cap_imag - cap_bare_imag) * 1000.       # fF
 
-        fit_result = least_squares(self.residuals_imag, initial_params, args=(self.temp, self.loss), method="lm")
-        self._dof_imag = self.loss.size - len(fit_result.x)
-        self._red_chi_sq_imag = 2. * fit_result.cost / self._dof_imag
-        print(f"\nLoss Fit: reduced chi^2 = {self._red_chi_sq_imag}")
-        print(fit_result)
-        self._fit_imag = fit_result.x
-
-    @staticmethod
-    def fit_function_real(params, temperature):
-        c0 = np.array([params[:temperature.shape[1]]])
-        ci = params[temperature.shape[1] - 1:]
-        rt = 300.
-        temp_rt = temperature - rt
-        poly = np.array(c0, dtype=np.float64) + ci[1] * temp_rt
-        for ii in range(2, len(ci)):
-            poly += ci[ii] * temp_rt ** ii
-        return poly
-
-    @classmethod
-    def residuals_real(cls, params, temperature, capacitance):
-        return (cls.fit_function_real(params, temperature) - capacitance).flatten("F")
-
-    @staticmethod
-    def fit_function_imag(params, temperature):
-        # center = params[2]
-        l0 = np.array([params[:temperature.shape[1]]])
-
-        li = params[temperature.shape[1] * 3 - 1:]
-
-        height = np.array(params[temperature.shape[1]:2*temperature.shape[1]])
-        width = np.array(params[2*temperature.shape[1]:3*temperature.shape[1]])
-        #center = params[3*temperature.shape[1]:4*temperature.shape[1]]
-        t0 = 120.
-        temp_t0 = temperature - t0
-        poly = np.array(l0, dtype=np.float64) + li[1] * temp_t0
-        for ii in range(2, len(li)):
-            poly += li[ii] * temp_t0 ** ii
-        arg = (temperature - 14) / width
-        return poly + height * np.exp(-0.5 * arg * arg)
-
-    @classmethod
-    def residuals_imag(cls, params, temperature, losses):
-        return (cls.fit_function_imag(params, temperature) - losses).flatten("F")
-    
-    def report_fits(self):
-        if self._fit_real is None:
-            print("Capacitances have not been fitted.")
+        if parallel_plate:
+            (real_chi, imag_chi), (real_chi_err, imag_chi_err) = capacitor.susceptibility_pp(
+                del_cap_real, del_cap_imag, gap_width, film_thickness, unit_cell=20, finger_length=1e-3,
+                finger_num=finger_num, delta_cap_real_err=del_cap_err_real, delta_cap_imag_err=del_cap_err_imag,
+                gap_err=gap_err, film_thickness_err=film_thickness_err, finger_length_err=finger_length_err
+            )
         else:
-            print("Capacitances at room temperature:")
-            for ii, f in enumerate(self.freq):
-                print(f" - C{subscript[0]} = {self._fit_real[ii]:.6f} pF @ {int(f)} Hz")
-            for ii in range(len(self._fit_real) - self.fnum):
-                print(f" - C{subscript[ii + 1]} = {self._fit_real[self.fnum + ii]:.6e} pF/K{superscript[ii + 1]}")
-        if self._fit_imag is None:
-            print("Losses have not been fitted.")
-        else:
-            print("Losses at room temperature:")
-            for ii, f in enumerate(self.freq):
-                print(f" - tan\u03B4{subscript[0]} = {self._fit_imag[ii]:.6e} @ {int(f)} Hz")
-            for ii in range(len(self._fit_imag) - 3 * self.fnum):
-                print(f" - tan\u03B4{subscript[ii + 1]} = {self._fit_imag[ii + self.fnum * 3]:.6e} K\u207B{superscript[ii + 1]}")
-            for ii, f in enumerate(self.freq):
-                print(f" - Amp = {self._fit_imag[ii + self.fnum]:.6e} @ {int(f)} Hz")
-            for ii, f in enumerate(self.freq):
-                print(f" - \u03c3 = {self._fit_imag[ii + self.fnum * 2]:.6f} K @ {int(f)} Hz")
+            (real_chi, imag_chi), (real_chi_err, imag_chi_err) = capacitor.susceptibility(
+                del_cap_real, del_cap_imag, gap_width, film_thickness, unit_cell=20, finger_length=1e-3,
+                finger_num=finger_num, delta_cap_real_err=del_cap_err_real, delta_cap_imag_err=del_cap_err_imag,
+                gap_err=gap_err, film_thickness_err=film_thickness_err, finger_length_err=finger_length_err
+            )
 
-    def load_bare(self, file: Path, start_clip: int = 0, end_clip: int=0):
-        dataset = DataSet(file)
-        if end_clip:
-            self.time = dataset.get_times()[start_clip:-end_clip, :]
-            self.temp = dataset.get_temperatures()[start_clip:-end_clip, :]
-            self.caps = dataset.get_capacitances()[start_clip:-end_clip, :]
-            self.loss = dataset.get_losses()[start_clip:-end_clip, :]
-        else:
-            self.time = dataset.get_times()[start_clip:, :]
-            self.temp = dataset.get_temperatures()[start_clip:, :]
-            self.caps = dataset.get_capacitances()[start_clip:, :]
-            self.loss = dataset.get_losses()[start_clip:, :]
-        self.freq = dataset.freqs
-        self.fnum = dataset.freq_num
-
-    def show_fit(self):
-        fig, axes = plt.subplots(2, 1, figsize=(6, 8))
-        x = np.linspace(4, 400, 10000)
-        x = np.dstack([x] * self.temp.shape[1])[0]
-
-        fit_to_plot = self.fit_function_real(self._fit_real, x)
-        for ii in range(self.fnum):
-            axes[0].plot(self.temp[:, ii], self.caps[:, ii], "x")
-            axes[0].plot(x, fit_to_plot[:, ii])
-        
-        fit_to_plot = self.fit_function_imag(self._fit_imag, x)
-        for ii in range(self.fnum):
-            axes[1].plot(self.temp[:, ii], self.loss[:, ii], "x")
-            axes[1].plot(x, fit_to_plot[:, ii])
-
-        for ax in axes:
-            ax.grid(linestyle='dotted')
-            ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
-            ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
-            ax.tick_params(axis="both", which="both", direction="in", top=True, right=True)
-        axes[0].set_ylabel('Capacitance (pF)')
-        axes[1].set_ylabel('Loss Tangent')
-        axes[1].set_xlabel('Temperature (K)')
-
-        real_text = f"polynomial order = {self.real_order}"
-        imag_text = f"polynomial order = {self.imag_order}"
-        axes[0].text(4, self.caps.max() * 0.9 + self.caps.min() * 0.1, real_text, ha="left")
-        axes[1].text(0.9, 0.9, imag_text, ha="right", transform=ax.transAxes)
-        fig.tight_layout()
-
-
-def fit_cap(file: Path, start_clip: int = 0, end_clip: int=0):
-    dataset = DataSet(file)
-    if end_clip:
-        time = dataset.get_times()[start_clip:-end_clip, :]
-        temp = dataset.get_temperatures()[start_clip:-end_clip, :]
-        caps = dataset.get_capacitances()[start_clip:-end_clip, :]
-        loss = dataset.get_losses()[start_clip:-end_clip, :]
-    else:
-        time = dataset.get_times()[start_clip:, :]
-        temp = dataset.get_temperatures()[start_clip:, :]
-        caps = dataset.get_capacitances()[start_clip:, :]
-        loss = dataset.get_losses()[start_clip:, :]
-    initial_params_cap = [1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2,
-                          1e-3, 1e-4, 1e-5, 1e-6, 1e-7, #1e-8, 1e-12
-                          ]
-    fit_result_cap = least_squares(residuals_cap, initial_params_cap, args=(temp, caps), method="lm")
-    initial_params_los = [1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5,
-                          1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 
-                          5, 5, 5, 5, 5, 5, 5, 
-                          #15, 15, 15, 15, 15, 15, 15, 
-                          1e-8, 1e-10, # 1e-12
-                          ]
-    fit_result_los = least_squares(residuals_los, initial_params_los, args=(temp, loss), method="lm")
-    print("Capacitance Fit")
-    print(fit_result_cap)
-    print(fit_result_cap.x)
-    print("\nLoss Fit")
-    print(fit_result_los)
-    print(fit_result_los.x)
-
-    print("Capacitances at room temperature:")
-    for ii, f in enumerate(dataset.freqs):
-        print(f" - C{subscript[0]} = {fit_result_cap.x[ii]:.6f} pF @ {int(f)} Hz")
-    for ii in range(len(fit_result_cap.x) - dataset.freq_num):
-        print(f" - C{subscript[ii + 1]} = {fit_result_cap.x[dataset.freq_num + ii]:.6e} pF/K{superscript[ii + 1]}")
-    
-    print("Losses at room temperature:")
-    for ii, f in enumerate(dataset.freqs):
-        print(f" - tan\u03B4{subscript[0]} = {fit_result_los.x[ii]:.6e} @ {int(f)} Hz")
-    for ii in range(len(fit_result_los.x) - 3 * dataset.freq_num):
-        print(f" - tan\u03B4{subscript[ii + 1]} = {fit_result_los.x[ii + dataset.freq_num * 3]:.6e} K\u207B{superscript[ii + 1]}")
-    for ii, f in enumerate(dataset.freqs):
-        print(f" - Amp = {fit_result_los.x[ii + dataset.freq_num]:.6e} @ {int(f)} Hz")
-    for ii, f in enumerate(dataset.freqs):
-        print(f" - \u03c3 = {fit_result_los.x[ii + dataset.freq_num * 2]:.6f} K @ {int(f)} Hz")
-    
-    # for ii, f in enumerate(dataset.freqs):
-    #     print(f" - tan\u03B4{subscript[0]} = {fit_function_los.x[ii]:.6e}  @ {int(f)} Hz")
-
-    x = np.linspace(4, 400, 10000)
-    x = np.dstack([x] * temp.shape[1])[0]
-    fit_to_plot = fit_function_cap(fit_result_cap.x, x)
-    fig, ax = plt.subplots(1, 1)
-    for ii in range(dataset.freq_num):
-        ax.plot(temp[:, ii], caps[:, ii], "x")
-        ax.plot(x, fit_to_plot[:, ii])
-    ax.grid(linestyle='dotted')
-    ax.set_xlabel('Temperature (K)')
-    ax.set_ylabel('Capacitance (pF)')
-    ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
-    ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
-    ax.tick_params(axis="both", which="both", direction="in", top=True, right=True)
-    fig.tight_layout()
-    
-    fig, ax = plt.subplots(1, 1)
-    fit_to_plot = fit_function_los(fit_result_los.x, x)
-    for ii in range(dataset.freq_num):
-        ax.plot(temp[:, ii], loss[:, ii], "x")
-        ax.plot(x, fit_to_plot[:, ii])
-    ax.grid(linestyle='dotted')
-    ax.set_xlabel('Temperature (K)')
-    ax.set_ylabel('Loss Tangent')
-    ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
-    ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
-    ax.tick_params(axis="both", which="both", direction="in", top=True, right=True)
-    fig.tight_layout()
-
-
-def fit_function_cap(params, temperature):
-    c0 = np.array([params[:temperature.shape[1]]])
-    ci = params[temperature.shape[1] - 1:]
-    rt = 300.
-    temp_rt = temperature - rt
-    poly = np.array(c0, dtype=np.float64) + ci[1] * temp_rt
-    for ii in range(2, len(ci)):
-        poly += ci[ii] * temp_rt ** ii
-    return poly
-
-def residuals_cap(params, temperature, capacitance):
-    return (fit_function_cap(params, temperature) - capacitance).flatten("F")
-
-def fit_function_los(params, temperature):
-    # center = params[2]
-    l0 = np.array([params[:temperature.shape[1]]])
-
-    li = params[temperature.shape[1] * 3 - 1:]
-
-    height = np.array(params[temperature.shape[1]:2*temperature.shape[1]])
-    width = np.array(params[2*temperature.shape[1]:3*temperature.shape[1]])
-    #center = params[3*temperature.shape[1]:4*temperature.shape[1]]
-    t0 = 120.
-    temp_t0 = temperature - t0
-    poly = np.array(l0, dtype=np.float64) + li[1] * temp_t0
-    for ii in range(2, len(li)):
-        poly += li[ii] * temp_t0 ** ii
-    arg = (temperature - 14) / width
-    return poly + height * np.exp(-0.5 * arg * arg)
-
-def residuals_los(params, temperature, losses):
-    return (fit_function_los(params, temperature) - losses).flatten("F")
-
-def func_plot(params, temperature):
-    cap_at_rt = np.array(params[:-2], dtype=np.float64)
-    slope = params[-2]# 5]
-    quadratic = params[-1]# 4]
-    # peak_loc = params[-3]
-    # sigma_inv = 1. / params[-2]
-    rt = 300.
-    temp_rt = temperature - rt
-    poly = cap_at_rt + slope * temp_rt + quadratic * temp_rt * temp_rt
-    return poly # + erf(sigma_inv * (temperature - peak_loc)) 
-
-
-def func_plot2(params, temperature):
-    peak_locs = np.array(params[:7])
-    loss_bases = np.array(params[7:-1])
-    sigma_inv = 1. / params[-1]
-    temp_offset = temperature - peak_locs
-    return loss_bases + sigma_inv * root2pi_inv * np.exp(-0.5 * sigma_inv * sigma_inv * temp_offset * temp_offset)
-
-
-def real_func(params, temperature):
-    cap_rts = params[:-2]# 5]
-    slope = params[-2]# 5]
-    quadratic = params[-1]# 4]
-    # peak_loc = params[-3]
-    # sigma_inv = 1. / params[-2]
-    data_per_freq = int(len(temperature) / len(cap_rts))
-    cap0s = np.ones(len(temperature))
-    rt = 300.
-    temp_rt = temperature - rt
-    for ii in range(len(cap_rts)):
-        cap0s[ii*data_per_freq:(ii+1)*data_per_freq] *= cap_rts[ii]
-    poly = cap0s + slope * temp_rt + quadratic * temp_rt * temp_rt
-    return poly # + erf(sigma_inv * (temperature - peak_loc)) 
-
-def imaj_func(params, temperature):
-    peak_locs = params[:7]
-    loss_bases = params[7:-1]
-    sigma_inv = 1. / params[-1]
-    data_per_freq = int(len(temperature) / len(peak_locs))
-    peak_locs_full = np.ones(len(temperature))
-    loss_bases_full = np.ones(len(temperature))
-    for ii in range(len(peak_locs)):
-        peak_locs_full[ii*data_per_freq:(ii+1)*data_per_freq] *= peak_locs[ii]
-        loss_bases_full[ii*data_per_freq:(ii+1)*data_per_freq] *= loss_bases[ii]
-    temp_offset = temperature - peak_locs_full
-    return loss_bases_full + sigma_inv * root2pi_inv * np.exp(-0.5 * sigma_inv * sigma_inv * temp_offset * temp_offset)
-
-def residuals1(params, temperature, capacitance):
-    return real_func(params, temperature) - capacitance # + imaj_func(params, temperature) - loss
-
-def residuals2(params, temperature, loss):
-    return imaj_func(params, temperature) - loss
+        data_at_freq = [None] * self.raw_data.freq_num
+        data_at_freq_lite = [None] * self.raw_data.freq_num
+        labels = []
+        labels_lite = []
+        for ff, freq in enumerate(self.raw_data.freqs):
+            labels.extend([f"{lab} ({int(freq)} Hz)" for lab in ProcessedFile.LABELS])
+            labels_lite.extend([f"{lab} ({int(freq)} Hz)" for lab in ProcessedFileLite.LABELS])
+            data_at_freq[ff] = np.stack((
+                time[:, ff],
+                temp[:, ff],
+                tempb[:, ff],
+                caps[:, ff],                                # C'
+                self.raw_data.cap_std[:, ff],
+                self.bare_cap_curve[:, ff],                 # C'_b
+                np.ones(data_pts) * self.bare_cap_dev[ff],
+                del_cap_real[:, ff],                        # del C'          
+                del_cap_err_real[:, ff],
+                loss[:, ff],                                # tan(delta)
+                self.raw_data.loss_std[:, ff],
+                self.bare_loss_curve[:, ff],                # tan(delta)_b
+                np.ones(data_pts) * self.bare_loss_dev[ff],
+                cap_imag[:, ff],                            # C''
+                cap_err_imag[:, ff],
+                cap_bare_imag[:, ff],                       # C''_b
+                cap_err_bare_imag[:, ff],
+                del_cap_imag[:, ff],                        # del C''
+                del_cap_err_imag[:, ff],
+                real_chi[:, ff],                            # real susceptibility
+                real_chi_err[:, ff],
+                imag_chi[:, ff],                            # imaginary susceptibility
+                imag_chi_err[:, ff],
+                volt[:, ff],
+                np.ones(data_pts) * freq,
+            ), axis=1)
+            data_at_freq_lite[ff] = np.stack((
+                time[:, ff],
+                temp[:, ff],
+                caps[:, ff] - self.bare_cap_curve[:, ff],   # del C'          
+                del_cap_err_real[:, ff],
+                del_cap_imag[:, ff],                        # del C''
+                del_cap_err_imag[:, ff],
+                real_chi[:, ff],                            # real susceptibility
+                real_chi_err[:, ff],
+                imag_chi[:, ff],                            # imaginary susceptibility
+                imag_chi_err[:, ff],
+                volt[:, ff],
+                np.ones(data_pts) * freq,
+            ), axis=1)
+        data = np.hstack(data_at_freq)
+        data_lite = np.hstack(data_at_freq_lite)
+        labels = ", ".join(labels)
+        labels_lite = ", ".join(labels_lite)
+        np.savetxt(self.dir / (self.name + "__calibrated.csv"), data, delimiter = ", ", header=labels)
+        np.savetxt(self.dir / (self.name + "__calibrated_lite.csv"), data_lite, delimiter = ", ", header=labels_lite)
 
 
 if __name__ == "__main__":
     import matplotlib.pylab as plt
+    params = {
+        "mathtext.fontset": "cm",
+        "font.family": "STIXGeneral",
+        "font.size": 12,
+        "xtick.top": True,
+        "ytick.right": True,
+        "xtick.direction": "in",
+        "ytick.direction": "in",
+        "xtick.minor.visible": True,
+        "ytick.minor.visible": True,
+        "grid.linestyle": "dotted",
+    }
+    plt.rcParams.update(params)
 
     # dir = Path("C:\\Users\\Teddy\\OneDrive - UCB-O365\\Rogerslab3\\Teddy\\TPP Films\\BTB-TPP\\2024 Film Growth\\Film 2\\BDS\\00 - Cals")
     # file = dir / "2024-02-29__none__M09-1-TT501__CAL__T-13-39_rev-freq.csv"
 
-    # file = Path(r"C:\Users\Teddy\OneDrive - UCB-O365\Rogerslab3\Teddy\TPP Films\BAP-TPP\Film 20241014\Dielectric\2024-10-11__bare__M01-2__CAL__T-12-16.csv")
-    file = Path(r"H:\OneDrive - UCB-O365\Rogerslab3\Teddy\TPP Films\BAP-TPP\Film 20241014\Dielectric\2024-10-11__bare__M01-2__CAL__T-12-16.csv")
-    bare = Bare(file)
-    bare.fit(real_order=5, imag_order=2)
-    #fit_cap(file)  #, 300, 200)
-    plt.show()
-    # print(data.data)
-    # print(data.shape)
-    # print(data.freqs)
-    # time = data.get_times()
-    # temp = data.get_temperatures()
-    # caps = data.get_capacitances()
-    # loss = data.get_losses()
-    # start = 100
-
-
-    # plt.figure()
-    # for ii in range(data.freq_num):
-    #     plt.plot(temp[start:, ii], caps[start:, ii])
-    # plt.figure()
-    # for ii in range(data.freq_num):
-    #     plt.plot(temp[start:, ii], loss[start:, ii])
-    # plt.figure()
-    # for ii in range(data.freq_num):
-    #     plt.plot(time[start:, ii], temp[start:, ii])
-    # 
-    # plt.show()
+    """BAP Film 2"""
+    # path = Path(r"C:\Users\Teddy\OneDrive - UCB-O365\Rogerslab3\Teddy\TPP Films\BAP-TPP\Film 20241014\Dielectric")
+    # bare_file = "2024-10-11__bare__M01-2__CAL__T-12-16.csv"
+    # film_file = "2024-10-15__BAPaTPP2-27C__M01-2__FILM__T-08-58.csv"
+    # file = Path(r"H:\OneDrive - UCB-O365\Rogerslab3\Teddy\TPP Films\BAP-TPP\Film 20241014\Dielectric\2024-10-11__bare__M01-2__CAL__T-12-16.csv")
     
+    """OLD BTP Film 2017"""
+    path = Path(r"C:\Users\Teddy\OneDrive - UCB-O365\Rogerslab3\Teddy\TPP Films\Old films\2017\11 - Novemember\BTP\BDS")
+    bare_file = "Calibration_TT2-17-15_Bare_1510274316_07_sorted_rev-freq.csv"
+    film_file1 = "HeliumCool_TT2-17-15_film_WYC103_1510686381_3_sorted_rev-freq.csv"
+    film_file2 = "HeliumCool_TT2-17-15_film_WYC103_1510694868_27_sorted_rev-freq.csv"
+    cal = Calibrate((path / film_file1, path / film_file2))
+    cal.load_calibration(path / bare_file, 5, 2)
+    cal.run()

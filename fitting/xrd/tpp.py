@@ -1,21 +1,18 @@
 import numpy as np
 from itertools import product
 from pathlib import Path
-import fabio
 import re
 from scipy.optimize import least_squares
 import matplotlib.pylab as plt
-import matplotlib
-matplotlib.rcParams['font.family'] = 'STIXGeneral'
-matplotlib.rcParams["mathtext.fontset"] = "cm"
 
-print("To run fit on powder:")
-print("fit = tpp.WAXS(a, c, q, counts, monoclinic=False, weights=None, name='')")
-print("fit = tpp.PXRD(a, c, 2theta, counts, monoclinic=False, name='')")
-print("To run fit on film:")
-print("for GIWAXS, q, counts, weights, sectors are all dictionaries")
-print("fit = tpp.GIWAXS(a, c, q, counts, weights, sectors, det_dist=150, sample_size=5, name: str="")")
-print("fit = tpp.FXRD(a, c, two_theta, counts, weights=None, name='')")
+def help():
+    print("To run fit on powder:")
+    print("fit = tpp.WAXS(a, c, q, counts, monoclinic=False, weights=None, name='')")
+    print("fit = tpp.PXRD(a, c, 2theta, counts, monoclinic=False, name='')")
+    print("To run fit on film:")
+    print("for GIWAXS, q, counts, weights, sectors are all dictionaries")
+    print("fit = tpp.GIWAXS(a, c, q, counts, weights, sectors, det_dist=150, sample_size=5, name: str="")")
+    print("fit = tpp.FXRD(a, c, two_theta, counts, weights=None, name='')")
 
 def load_ras(filename: Path):
     try:
@@ -1231,7 +1228,8 @@ class PXRD(Powder):
         super().__init__(a, c, q, counts, monoclinic, weights, det_dist,
                          sample_size, wavelength, name, background)
         self.hex_params["w0"] = 0.003
-        self.mono_params["w0"] = 0.003
+        if isinstance(self.mono_params, dict):
+            self.mono_params["w0"] = 0.003
 
 
 class WAXS(Powder):
@@ -1445,6 +1443,7 @@ class GIWAXS(Film):
         self.sectors = {}
         for key in keys:
             for file in path_to_data.glob(f"*{key}*.edf"):
+                print(file.name)
                 try:
                     print(f"Loading {file.relative_to(Path.cwd()).as_posix()}")
                 except ValueError:

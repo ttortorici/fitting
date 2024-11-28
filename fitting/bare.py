@@ -2,9 +2,7 @@ from fitting.data import DataSet
 import numpy as np
 from scipy.optimize import least_squares
 import matplotlib.pylab as plt
-import matplotlib
-matplotlib.rcParams['font.family'] = 'STIXGeneral'
-matplotlib.rcParams["mathtext.fontset"] = "cm"
+plt.style.use("fitting.style")
 
 
 class Bare:
@@ -79,7 +77,7 @@ class Bare:
         fit = self.function(self.temperature_fit, self.c300, self.linear, self.quadratic)
 
         fig, ax = plt.subplots(1, 1, figsize=(4, 3.5))
-        ax.grid(linestyle='dotted')
+        ax.grid()
         for ii in range(self.freq_num):
             if self.reverse:
                 ii = self.freq_num - ii - 1
@@ -103,8 +101,5 @@ class Bare:
         ax.set_title("Bare Capacitor")
         ax.set_xlabel("Temperature (K)")
         ax.set_ylabel("Capacitance (pF)")
-        ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
-        ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
-        ax.tick_params(axis="both", which="both", direction="in", top=True, right=True)
         fig.tight_layout()
         return fig, ax

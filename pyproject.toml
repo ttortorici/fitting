@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fitting"
+version = "2.1"
+description = "Least squares fitting of data to various models for my PhD thesis"
+authors = [
+    { name = "Teddy Tortorici", email = "edward.tortorici@colorado.edu" }
+]
+classifiers = [
+    "Natural Language :: English",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: GNU General Public License (GPL)",
+    "Operating System :: OS Independent"
+]
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+]
+readme = "README.md"
+license = { text = "GPL" }
+
+[project.scripts]
+bare-fit = "fitting.programs:bare_fit"
+calibrate-capacitor = "fitting.programs:calibrate_capacitor"
+
+[tool.setuptools.packages.find]
+include = ["fitting", "fitting.*"]
+
+[tool.setuptools.package-data]
+fitting = ["**/*.mplstyle"]
