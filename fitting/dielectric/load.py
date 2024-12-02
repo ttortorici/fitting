@@ -2,7 +2,7 @@ from pathlib import Path
 import numpy as np
 from scipy.optimize import least_squares
 import matplotlib.pylab as plt
-plt.style.use("latex")
+plt.style.use("fitting.style")
 
 class RawFile:
     TIME_IND = 0
