@@ -26,6 +26,7 @@ dependencies = [
     "numpy",
     "scipy",
     "matplotlib",
+    "toml",
 ]
 readme = "README.md"
 license = { text = "GPL" }

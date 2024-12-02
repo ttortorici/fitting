@@ -2,8 +2,10 @@ from fitting.dielectric.bare import Bare
 from fitting.dielectric.load import RawData, ProcessedFile
 from fitting.dielectric.calibrate import Calibrate
 from pathlib import Path
+from datetime import datetime
 import matplotlib.pylab as plt
 import argparse
+import toml
 
 plt.style.use("fitting.style")
 
@@ -46,6 +48,13 @@ def calibrate_capacitor():
     parser.add_argument("-M", "--max_temperature", help="Cut off temperatures above this value (in K).")
     parser.add_argument("-pp", "--parallel_plate", action="store_true", help="Use parallel plate approximation.")
     args = parser.parse_args()
+
+    args_dict = vars(args)
+
+    now = datetime.now()
+
+    with open(f"calibration-{now.year}-{now.month:02}-{now.day:02}_{now.hour:02}-{now.minute:02}.toml", "w") as toml_file:
+        toml.dump(args_dict, toml_file)
 
     bare_files = [Path(f).resolve() for f in args.bare_file.split(",")]
     film_files = [Path(f).resolve() for f in args.film_file.split(",")]

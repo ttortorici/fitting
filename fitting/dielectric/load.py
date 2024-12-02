@@ -189,12 +189,12 @@ class ProcessedFile(RawFile):
     LABELS = ["Time [s]", "Temperature A [K]", "Temperature B [K]",
               "Capacitance [pF]", "Cap STD [pF]",
               "Bare Cap Curves [pF]", "Bare Cap STD [pF]",
-              "Delta C' [fF]", "Delta C' STD [fF]",
+              "Delta C' [pF]", "Delta C' STD [pF]",
               "Loss Tangent", "Loss Tangent STD",
               "Bare Loss", "Bare Loss STD",
               "C'' [pF]", "C'' STD [PF]",
               "Bare C'' [pF]", "Bare C'' STD [pF]",
-              "Delta C'' [fF]", "Delta C'' STD [fF]",
+              "Delta C'' [pF]", "Delta C'' STD [pF]",
               "Real Susceptibility", "Real Susceptibility STD",
               "Imaginary Susceptibility", "Imaginary Susceptibility STD",
               "Voltage [V]", "Frequency [Hz]"]
@@ -301,8 +301,8 @@ class ProcessedFile(RawFile):
 
 class ProcessedFileLite(ProcessedFile):
     LABELS = ["Time [s]", "Temperature A [K]",
-              "Delta C' [fF]", "Delta C' STD [fF]",
-              "Delta C'' [fF]", "Delta C'' STD [fF]",
+              "Delta C' [pF]", "Delta C' STD [pF]",
+              "Delta C'' [pF]", "Delta C'' STD [pF]",
               "Real Susceptibility", "Real Susceptibility STD",
               "Imaginary Susceptibility", "Imaginary Susceptibility STD",
               "Voltage [V]", "Frequency [Hz]"]

@@ -48,8 +48,8 @@ class Calibrate:
         del_cap_err_real = np.sqrt(self.raw_data.cap_std * self.raw_data.cap_std + self.bare_cap_dev * self.bare_cap_dev)
         del_cap_err_imag = np.sqrt(cap_err_imag * cap_err_imag + cap_err_bare_imag * cap_err_bare_imag)
         
-        del_cap_real = (caps - self.bare_cap_curve) * 1000.     # fF
-        del_cap_imag = (cap_imag - cap_bare_imag) * 1000.       # fF
+        del_cap_real = (caps - self.bare_cap_curve)     # pF
+        del_cap_imag = (cap_imag - cap_bare_imag)       # pF
 
         if parallel_plate:
             (real_chi, imag_chi), (real_chi_err, imag_chi_err) = capacitor.susceptibility_pp(

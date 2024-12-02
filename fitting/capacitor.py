@@ -2,7 +2,7 @@ import numpy as np
 from scipy.special import ellipk
 
 
-eps0_ff_m = 8854.18782 # ff/m
+eps0 = 8.85418782 # pf/m
 
 
 def elliptic_modulus(gap, film_thickness, unit_cell):
@@ -76,7 +76,7 @@ def susceptibility_pp(delta_cap_real: float, delta_cap_imag: float, gap: float, 
                    unit_cell: float=20, finger_length:float = 1e-3, finger_num: int=50,
                    delta_cap_real_err: float=0., delta_cap_imag_err: float=0., gap_err: float=0.,
                    film_thickness_err: float=0., finger_length_err: float=0.):
-    inv_Cx = gap / (eps0_ff_m * (finger_num - 1) * finger_length * film_thickness)
+    inv_Cx = gap / (eps0 * (finger_num - 1) * finger_length * film_thickness)
     real_susceptibility = delta_cap_real * inv_Cx
     imag_susceptibility = delta_cap_imag * inv_Cx
 
@@ -119,7 +119,7 @@ def susceptibility(delta_cap_real: float, delta_cap_imag: float, gap: float, fil
                    unit_cell: float=20, finger_length:float = 1e-3, finger_num: int=50,
                    delta_cap_real_err: float=0., delta_cap_imag_err: float=0., gap_err: float=0.,
                    film_thickness_err: float=0., finger_length_err: float=0.):
-    common_denom = 1. / (eps0_ff_m * (finger_num - 1) * finger_length)
+    common_denom = 1. / (eps0 * (finger_num - 1) * finger_length)
     log16_over_pi = np.log(16.) / np.pi
     gap_thick_ratio = gap / film_thickness
     inv_Cx = common_denom * (log16_over_pi + gap_thick_ratio)
@@ -172,12 +172,12 @@ if __name__ == "__main__":
 
     print("Using Teddy's thin film approximation")
     print(f"G = {g_thin:.8e} m")
-    print(f"C = {g_thin * eps0_ff_m:.8e} fF\n")
+    print(f"C = {g_thin * eps0:.8e} fF\n")
 
     print("Using scipy elliptic integrals")
     print(f"G = {g_thick:.8e} m")
-    print(f"C = {g_thick * eps0_ff_m:.8e} fF\n")
+    print(f"C = {g_thick * eps0:.8e} fF\n")
 
     print("Using parallel plate approximation")
     print(f"G = {g_pp:.8e} m")
-    print(f"C = {g_pp * eps0_ff_m:.8e} fF")
+    print(f"C = {g_pp * eps0:.8e} fF")
