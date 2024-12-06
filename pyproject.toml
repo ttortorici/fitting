@@ -34,9 +34,10 @@ license = { text = "GPL" }
 [project.scripts]
 bare-fit = "fitting.programs:bare_fit"
 calibrate-capacitor = "fitting.programs:calibrate_capacitor"
+plot-spectra = "fitting.programs:plot"
 
 [tool.setuptools.packages.find]
 include = ["fitting", "fitting.*"]
 
 [tool.setuptools.package-data]
-fitting = ["**/*.mplstyle"]
+fitting = ["style.mplstyle", "config.toml"]

@@ -53,13 +53,13 @@ class Calibrate:
 
         if parallel_plate:
             (real_chi, imag_chi), (real_chi_err, imag_chi_err) = capacitor.susceptibility_pp(
-                del_cap_real, del_cap_imag, gap_width, film_thickness, unit_cell=20, finger_length=1e-3,
+                del_cap_real, del_cap_imag, gap_width, film_thickness, finger_length=1e-3,
                 finger_num=finger_num, delta_cap_real_err=del_cap_err_real, delta_cap_imag_err=del_cap_err_imag,
                 gap_err=gap_err, film_thickness_err=film_thickness_err, finger_length_err=finger_length_err
             )
         else:
             (real_chi, imag_chi), (real_chi_err, imag_chi_err) = capacitor.susceptibility(
-                del_cap_real, del_cap_imag, gap_width, film_thickness, unit_cell=20, finger_length=1e-3,
+                del_cap_real, del_cap_imag, gap_width, film_thickness, finger_length=1e-3,
                 finger_num=finger_num, delta_cap_real_err=del_cap_err_real, delta_cap_imag_err=del_cap_err_imag,
                 gap_err=gap_err, film_thickness_err=film_thickness_err, finger_length_err=finger_length_err
             )

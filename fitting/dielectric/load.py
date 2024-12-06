@@ -14,7 +14,7 @@ class RawFile:
     FREQ_IND = 6
     COLS_PER = 7
 
-    def __init__(self, files: Path, ):
+    def __init__(self, files: Path):
         if isinstance(files, Path) or isinstance(files, str):
             self.data = self.loadtxt(files)
         elif isinstance(files, list) or isinstance(files, tuple):
@@ -25,7 +25,10 @@ class RawFile:
 
         self.freq_num = int(self.shape[1] / self.COLS_PER)
         self.freqs = [self.data[0, index] for index in self.get_inds(self.FREQ_IND)]
-        self.cap_std, self.loss_std = self.determine_variance(10, 1)
+
+    def set_temperature_cut(self, temperature: float):
+        mask = np.all(self.get_temperatures() < temperature, axis=1)
+        self.data = self.data[mask]
 
     def determine_variance(self, slice_size: int, poly_order: int):
         params_c = [0] * (poly_order + 1)
@@ -177,7 +180,7 @@ class RawFile:
         ax_im.grid()
         ax_im.legend()
         fig.tight_layout()
-        
+        return fig, (ax_re, ax_im)
 
 
     @staticmethod
@@ -225,6 +228,17 @@ class ProcessedFile(RawFile):
     VOLT_IND = 23
     FREQ_IND = 24
     COLS_PER = 25
+
+    def determine_ascending(self):
+        derivative = self.calc_time_derivatives()
+        ascending = np.all(derivative >= 0, axis=1)
+        return ascending
+    
+    def calc_time_derivatives(self):
+        time_inds = self.get_inds(RawData.TIME_IND)
+        temp_inds = self.get_inds(RawData.TEMPA_IND)
+        derivative = (self.data[1:, temp_inds] - self.data[:-1, temp_inds]) / (self.data[1:, time_inds] - self.data[:-1, time_inds])
+        return np.vstack((derivative, np.zeros(self.freq_num)))
 
     def get_capacitance_errors(self):
         inds = self.get_inds(self.CAPERR_IND)
@@ -291,12 +305,75 @@ class ProcessedFile(RawFile):
         return self.data[:, inds]
     
     def get_imaginary_susceptibilities(self):
-        inds = self.get_inds(self.CHIRE_IND)
+        inds = self.get_inds(self.CHIIM_IND)
         return self.data[:, inds]
     
     def get_imaginary_susceptibility_errors(self):
-        inds = self.get_inds(self.CHIRE_IND)
+        inds = self.get_inds(self.CHIIM_IND)
         return self.data[:, inds]
+    
+    def plot(self, figsize=None, vertical=True, plot_sus=False):
+        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        temperature = self.get_temperatures()
+        
+        if vertical:
+            if figsize is None:
+                figsize = (6, 8)
+            fig, (ax_re, ax_im) = plt.subplots(2, 1, figsize=figsize)
+        else:
+            if figsize is None:
+                figsize = (6.5, 4)
+            fig, (ax_re, ax_im) = plt.subplots(1, 2, figsize=figsize)
+            ax_re.set_xlabel("Temperature (K)")
+        
+        if plot_sus:
+            real = self.get_real_susceptibilities
+            imag = self.get_imaginary_susceptibilities
+            ax_re.set_ylabel("$\\chi'$")
+            ax_im.set_ylabel("$\\chi''$")
+        else:
+            real = self.get_capacitance_shifts_real
+            imag = self.get_imaginary_capacitance_shifts
+            ax_re.set_ylabel("$\\Delta C'$ (pF)")
+            ax_im.set_ylabel("$\\Delta C''$ (pF)")
+        
+        for ff, freq in enumerate(self.freqs):
+            freq_str = str(int(freq))
+            if len(freq_str) > 4:
+                freq_str = f"{freq_str[:-3]} kHz"
+            else:
+                freq_str += " Hz"
+            ax_re.scatter(
+                temperature[:, ff],
+                real[:, ff],
+                s=5,
+                facecolor="w",
+                edgecolor=colors[ff % len(colors)],
+                lw=.75,
+                label=freq_str,
+            )
+        ax_im.set_xlabel("Temperature (K)")
+        
+        for ff, freq in enumerate(self.freqs):
+            freq_str = str(int(freq))
+            if len(freq_str) > 4:
+                freq_str = f"{freq_str[:-3]} kHz"
+            else:
+                freq_str += " Hz"
+            ax_im.scatter(
+                temperature[:, ff],
+                imag[:, ff],
+                s=5,
+                facecolor="w",
+                edgecolor=colors[ff % len(colors)],
+                lw=.75,
+                label=freq_str,
+            )
+        ax_re.grid()
+        ax_im.grid()
+        ax_im.legend()
+        fig.tight_layout()
+        return fig, (ax_re, ax_im)
     
 
 class ProcessedFileLite(ProcessedFile):
@@ -333,6 +410,9 @@ class ProcessedFileLite(ProcessedFile):
     CAPIMERR_IND = None
     BARECIM_IND = None
     BARECIMERR_IND = None
+
+    def plot(self, figsize=None, vertical=True, plot_sus=True):
+        super().plot(figsize, vertical, plot_sus)
     
 
 class RawData(RawFile):
@@ -340,18 +420,8 @@ class RawData(RawFile):
     def __init__(self, files):
         super().__init__(files)
         # self.determine_ascending()
+        self.cap_std, self.loss_std = self.determine_variance(10, 1)
         self.time_derivative_filter()
-
-    def determine_ascending(self):
-        derivative = self.calc_time_derivatives()
-        ascending = np.all(derivative >= 0, axis=1)
-        return ascending
-    
-    def calc_time_derivatives(self):
-        time_inds = self.get_inds(RawData.TIME_IND)
-        temp_inds = self.get_inds(RawData.TEMPA_IND)
-        derivative = (self.data[1:, temp_inds] - self.data[:-1, temp_inds]) / (self.data[1:, time_inds] - self.data[:-1, time_inds])
-        return np.vstack((derivative, np.zeros(self.freq_num)))
     
     def time_derivative_filter(self):
         print(f"filtering data with shape: {self.data.shape}")

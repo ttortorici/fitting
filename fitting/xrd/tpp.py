@@ -1513,7 +1513,7 @@ class GIWAXS(Film):
         # hwhm = 0.5 * np.sqrt(fwhm_sq)
         
         q_c = TWO_PI * inv_d                                     # find q-centers from inv_d
-        q_shift = self.q[sector] - q_c                                  # center q from the q-centers
+        q_shift = self.q[sector] - q_c                           # center q from the q-centers
         q_shift_sq = q_shift * q_shift
 
         hex_peaks = np.sum(
