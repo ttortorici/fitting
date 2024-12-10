@@ -114,7 +114,7 @@ def plot():
 
     if args.real_limits is not None:
         ax_re.set_ylim([float(num) for num in args.real_limits.split(",")])
-    if args.imag_limits is not None:
+    if args.imaginary_limits is not None:
         ax_im.set_ylim([float(num) for num in args.imaginary_limits.split(",")])
 
     if args.save is not None:

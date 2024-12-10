@@ -8,3 +8,6 @@ ytick.direction: in
 xtick.minor.visible: True
 ytick.minor.visible: True
 grid.linestyle: dotted
+
+text.usetex: True
+text.latex.preamble: \usepackage{amsmath, textcomp}

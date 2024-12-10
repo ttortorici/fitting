@@ -43,6 +43,8 @@ class Debye:
         self.imag_bkgd_1 = 0
         self.imag_bkgd_2 = 0
 
+        params_list = ["ln_attempt", "activation", ]
+
         self.spacing = np.arange(1, 6, dtype=np.float64).reshape((5, 1, 1, 1))
         self.asym_term = np.empty((self.debye_peaks, self.data_num, self.freq_num))
 
@@ -52,7 +54,8 @@ class Debye:
     def set(self, attribute: str, value):
         setattr(self, attribute, value)
 
-    def fit(self, free_params: list[str]):
+    # def fit(self, free_params: list[str]):
+
 
     def set_upper_temperature(self, upper_temperature: float):
         mask = np.all(self.temp < upper_temperature, axis=1)

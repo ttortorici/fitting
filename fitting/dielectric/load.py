@@ -30,6 +30,28 @@ class RawFile:
         mask = np.all(self.get_temperatures() < temperature, axis=1)
         self.data = self.data[mask]
 
+    def determine_ascending(self):
+        derivative = self.calc_time_derivatives()
+        ascending = np.all(derivative >= 0, axis=1)
+        return ascending
+    
+    def calc_time_derivatives(self):
+        time_inds = self.get_inds(RawData.TIME_IND)
+        temp_inds = self.get_inds(RawData.TEMPA_IND)
+        derivative = (self.data[1:, temp_inds] - self.data[:-1, temp_inds]) / (self.data[1:, time_inds] - self.data[:-1, time_inds])
+        return np.vstack((derivative, np.zeros(self.freq_num)))
+
+    def time_derivative_filter(self):
+        print(f"filtering data with shape: {self.data.shape}")
+
+        derivative = self.calc_time_derivatives()
+        is_close = np.logical_not(np.all(np.isclose(derivative, 0, atol=1e-3, rtol=2e-3), axis=1))
+        self.data = self.data[is_close]
+        self.cap_std = self.cap_std[is_close]
+        self.loss_std = self.loss_std[is_close]
+        print(f"now is shape: {self.data.shape}")
+        self.shape = self.data.shape
+
     def determine_variance(self, slice_size: int, poly_order: int):
         params_c = [0] * (poly_order + 1)
         params_l = params_c.copy()
@@ -229,17 +251,6 @@ class ProcessedFile(RawFile):
     FREQ_IND = 24
     COLS_PER = 25
 
-    def determine_ascending(self):
-        derivative = self.calc_time_derivatives()
-        ascending = np.all(derivative >= 0, axis=1)
-        return ascending
-    
-    def calc_time_derivatives(self):
-        time_inds = self.get_inds(RawData.TIME_IND)
-        temp_inds = self.get_inds(RawData.TEMPA_IND)
-        derivative = (self.data[1:, temp_inds] - self.data[:-1, temp_inds]) / (self.data[1:, time_inds] - self.data[:-1, time_inds])
-        return np.vstack((derivative, np.zeros(self.freq_num)))
-
     def get_capacitance_errors(self):
         inds = self.get_inds(self.CAPERR_IND)
         return self.data[:, inds]
@@ -327,13 +338,13 @@ class ProcessedFile(RawFile):
             ax_re.set_xlabel("Temperature (K)")
         
         if plot_sus:
-            real = self.get_real_susceptibilities
-            imag = self.get_imaginary_susceptibilities
+            real = self.get_real_susceptibilities()
+            imag = self.get_imaginary_susceptibilities()
             ax_re.set_ylabel("$\\chi'$")
             ax_im.set_ylabel("$\\chi''$")
         else:
-            real = self.get_capacitance_shifts_real
-            imag = self.get_imaginary_capacitance_shifts
+            real = self.get_capacitance_shifts_real()
+            imag = self.get_imaginary_capacitance_shifts()
             ax_re.set_ylabel("$\\Delta C'$ (pF)")
             ax_im.set_ylabel("$\\Delta C''$ (pF)")
         
@@ -412,7 +423,8 @@ class ProcessedFileLite(ProcessedFile):
     BARECIMERR_IND = None
 
     def plot(self, figsize=None, vertical=True, plot_sus=True):
-        super().plot(figsize, vertical, plot_sus)
+        fig, axes = super().plot(figsize, vertical, plot_sus)
+        return fig, axes
     
 
 class RawData(RawFile):
@@ -422,17 +434,6 @@ class RawData(RawFile):
         # self.determine_ascending()
         self.cap_std, self.loss_std = self.determine_variance(10, 1)
         self.time_derivative_filter()
-    
-    def time_derivative_filter(self):
-        print(f"filtering data with shape: {self.data.shape}")
-
-        derivative = self.calc_time_derivatives()
-        is_close = np.logical_not(np.all(np.isclose(derivative, 0, atol=1e-3, rtol=2e-3), axis=1))
-        self.data = self.data[is_close]
-        self.cap_std = self.cap_std[is_close]
-        self.loss_std = self.loss_std[is_close]
-        print(f"now is shape: {self.data.shape}")
-        self.shape = self.data.shape
 
 
 def reverse_freqs_in_data_set(file: Path):
