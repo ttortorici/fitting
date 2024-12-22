@@ -46,11 +46,11 @@ class Bare:
         self.data = None
         self.load_bare(data_files, max_temperature=max_temperature)
     
-    def fit(self, real_order, imag_order):
+    def fit(self, real_order, imag_order, peaks=True):
         self.fit_real(real_order)
-        self.fit_imag(imag_order)
-        self.report_fit()
-        self.show_fit()
+        self.fit_imag(imag_order, peaks=peaks)
+        self.report_fit(peaks=peaks)
+        self.show_fit(peaks=peaks)
     
     def fit_real(self, poly_order: int, room_temperature_measurement: float=1.2):
         if self.time is None:
@@ -66,15 +66,20 @@ class Bare:
         print(fit_result)
         self._fit_real = fit_result.x
         
-    def fit_imag(self, poly_order: int, room_temperature_measurement: float = 1e-5):
+    def fit_imag(self, poly_order: int, room_temperature_measurement: float = 1e-5, peaks=True):
         if self.time is None:
             raise AttributeError("Need to load data first with .load_bare(file)")
         self.imag_order = poly_order
-        initial_params = [room_temperature_measurement] * (2 * self.fnum)
-        initial_params.extend([5] * self.fnum)
+        initial_params = [room_temperature_measurement] * self.fnum
+        if peaks:
+            initial_params.extend([room_temperature_measurement] * self.fnum)
+            initial_params.extend([5] * self.fnum)
         initial_params.extend(list(np.logspace(-8, -8-poly_order, poly_order)))
-
-        fit_result = least_squares(self.residuals_imag, initial_params, args=(self.temp, self.loss), method="lm")
+        
+        if peaks:
+            fit_result = least_squares(self.residuals_imag_peaks, initial_params, args=(self.temp, self.loss), method="lm")
+        else: 
+            fit_result = least_squares(self.residuals_imag_poly, initial_params, args=(self.temp, self.loss), method="lm")
         self._dof_imag = self.loss.size - len(fit_result.x)
         self._red_chi_sq_imag = 2. * fit_result.cost / self._dof_imag
         print(f"\nLoss Fit: reduced chi^2 = {self._red_chi_sq_imag}")
@@ -97,11 +102,11 @@ class Bare:
         return (cls.fit_function_real(params, temperature) - capacitance).flatten("F")
 
     @staticmethod
-    def fit_function_imag(params, temperature):
+    def fit_function_imag_peaks(params, temperature):
         # center = params[2]
         l0 = np.array([params[:temperature.shape[1]]])
 
-        li = params[temperature.shape[1] * 3 - 1:]
+        li = params[temperature.shape[1] * 3:]
 
         height = np.array(params[temperature.shape[1]:2*temperature.shape[1]])
         width = np.array(params[2*temperature.shape[1]:3*temperature.shape[1]])
@@ -113,12 +118,30 @@ class Bare:
             poly += li[ii] * temp_t0 ** ii
         arg = (temperature - 14) / width
         return poly + height * np.exp(-0.5 * arg * arg)
+    
+    @staticmethod
+    def fit_function_imag_poly(params, temperature):
+        # center = params[2]
+        l0 = np.array([params[:temperature.shape[1]]])
+
+        li = params[temperature.shape[1]:]
+
+        t0 = 120.
+        temp_t0 = temperature - t0
+        poly = np.array(l0, dtype=np.float64)
+        for ii in range(1, len(li)):
+            poly += li[ii] * temp_t0 ** ii
+        return poly
 
     @classmethod
-    def residuals_imag(cls, params, temperature, losses):
-        return (cls.fit_function_imag(params, temperature) - losses).flatten("F")
+    def residuals_imag_peaks(cls, params, temperature, losses):
+        return (cls.fit_function_imag_peaks(params, temperature) - losses).flatten("F")
     
-    def report_fit(self):
+    @classmethod
+    def residuals_imag_poly(cls, params, temperature, losses):
+        return (cls.fit_function_imag_poly(params, temperature) - losses).flatten("F")
+    
+    def report_fit(self, peaks=True):
         if self._fit_real is None:
             print("Capacitances have not been fitted.")
         else:
@@ -137,11 +160,12 @@ class Bare:
                 print(f" - tan\u03B4{subscript[0]} = {self._fit_imag[ii]:.6e} @ {int(f)} Hz")
             for ii in range(len(self._fit_imag) - 3 * self.fnum):
                 print(f" - tan\u03B4{subscript[ii + 1]} = {self._fit_imag[ii + self.fnum * 3]:.6e} K\u207B{superscript[ii + 1]}")
-            for ii, f in enumerate(self.freq):
-                print(f" - Amp = {self._fit_imag[ii + self.fnum]:.6e} @ {int(f)} Hz")
-            for ii, f in enumerate(self.freq):
-                print(f" - \u03c3 = {self._fit_imag[ii + self.fnum * 2]:.6f} K @ {int(f)} Hz")
-        self.variance()
+            if peaks:
+                for ii, f in enumerate(self.freq):
+                    print(f" - Amp = {self._fit_imag[ii + self.fnum]:.6e} @ {int(f)} Hz")
+                for ii, f in enumerate(self.freq):
+                    print(f" - \u03c3 = {self._fit_imag[ii + self.fnum * 2]:.6f} K @ {int(f)} Hz")
+        self.variance(peaks=peaks)
         # self.variance_point_to_point()
 
     def load_bare(self, file: Path, max_temperature: float=None):
@@ -182,7 +206,7 @@ class Bare:
         print(" |")
         
 
-    def variance(self):
+    def variance(self, peaks: bool):
         fitted_curve = self.fit_function_real(self._fit_real, self.temp)
         error = self.caps - fitted_curve
         variance = np.sum(error * error, axis=0) / (self.caps.shape[0] - 1)
@@ -222,7 +246,10 @@ class Bare:
         #     print(string, end="")
         # print(" |")
 
-        fitted_curve = self.fit_function_imag(self._fit_imag, self.temp)
+        if peaks:
+            fitted_curve = self.fit_function_imag_peaks(self._fit_imag, self.temp)
+        else:
+            fitted_curve = self.fit_function_imag_poly(self._fit_imag, self.temp)
         error = self.loss - fitted_curve
         variance = np.sum(error * error, axis=0) / (self.loss.shape[0] - 1)
         standard_deviation = np.sqrt(variance)
@@ -254,7 +281,7 @@ class Bare:
         #     print(string, end="")
         # print(" |")
 
-    def show_fit(self):
+    def show_fit(self, peaks: bool):
         fig, axes = plt.subplots(2, 1, figsize=(6, 8))
         x = np.linspace(4, 400, 10000)
         x = np.dstack([x] * self.temp.shape[1])[0]
@@ -264,7 +291,12 @@ class Bare:
             axes[0].plot(self.temp[:, ii], self.caps[:, ii], "x", label=f"{int(self.freq[ii])} Hz")
             axes[0].plot(x, fit_to_plot[:, ii])
         
-        fit_to_plot = self.fit_function_imag(self._fit_imag, x)
+        if peaks:
+            fit_to_plot = self.fit_function_imag_peaks(self._fit_imag, x)
+        else:
+            fit_to_plot = self.fit_function_imag_poly(self._fit_imag, x)
+            if fit_to_plot.shape[0] == 1:
+                fit_to_plot = np.tile(fit_to_plot, (x.shape[0], 1))
         for ii in range(self.fnum):
             axes[1].plot(self.temp[:, ii], self.loss[:, ii], "x", label=f"{int(self.freq[ii])} Hz")
             axes[1].plot(x, fit_to_plot[:, ii])

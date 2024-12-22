@@ -19,16 +19,21 @@ def bare_fit():
     parser.add_argument("file", help="The CSV file containing bare capacitance data")
     parser.add_argument("real_order", type=int, help="The polynomial order for fitting the capacitance data")
     parser.add_argument("imaginary_order", type=int, help="The polynomial order for fitting the loss tangent data")
-    parser.add_argument("-M", "--max-temperature", type=float, default=None, help="Optionally cut out temperatures above this value (in K).")
+    parser.add_argument("-M", "--max_temperature", type=float, default=None, help="Optionally cut out temperatures above this value (in K).")
+    parser.add_argument("-F", "--no_peaks", action="store_true", help="Don't fit peaks in the loss")
     args = parser.parse_args()
 
     files = [Path(f).resolve() for f in args.file.split(",")]
 
     bare = Bare(files, args.max_temperature)
-    bare.fit(real_order=args.real_order, imag_order=args.imaginary_order)
+    bare.fit(real_order=args.real_order, imag_order=args.imaginary_order, peaks=not args.no_peaks)
     
     keys_real = [f"order 0 @ {int(f)} Hz" for f in bare.freq] + [f"order {ii}" for ii in range(1, args.real_order + 1)]
-    keys_imag = [f"order 0 @ {int(f)} Hz" for f in bare.freq] + [f"height @ {int(f)} Hz" for f in bare.freq] + [f"width @ {int(f)} Hz" for f in bare.freq] + [f"order {ii}" for ii in range(1, args.imaginary_order + 1)]
+    keys_imag = [f"order 0 @ {int(f)} Hz" for f in bare.freq] 
+    if not args.no_peaks:
+        keys_imag += [f"height @ {int(f)} Hz" for f in bare.freq] + [f"width @ {int(f)} Hz" for f in bare.freq] 
+    keys_imag += [f"order {ii}" for ii in range(1, args.imaginary_order + 1)]
+    
     rslt_real = [float(rslt) for rslt in bare._fit_real]
     rslt_imag = [float(rslt) for rslt in bare._fit_imag]
     results_real = dict(zip(keys_real, rslt_real))
@@ -60,10 +65,11 @@ def calibrate_capacitor():
     parser.add_argument("gap_width", type=float, help="gap width in microns.")
     parser.add_argument("-N", "--finger_num", type=int, default=50, help="Number of fingers on the capacitor.")
     parser.add_argument("-TE", "--thickness_error", type=float, default=5., help="Estimated film thickness error in nanometers.")
-    parser.add_argument("-GE", "--gap_error", type=float, default=0.2, help="Estimated error of the gap width in microns.")
-    parser.add_argument("-FE", "--finger_length_error", type=float, default=.5, help="Experimental error of the finger length in microns (should be roughly half the over-etching).")
+    parser.add_argument("-GE", "--gap_error", type=float, default=0.1, help="Estimated error of the gap width in microns.")
+    parser.add_argument("-FE", "--finger_length_error", type=float, default=0., help="Experimental error of the finger length in microns (should be roughly half the over-etching).")
     parser.add_argument("-M", "--max_temperature", help="Cut off temperatures above this value (in K).")
     parser.add_argument("-pp", "--parallel_plate", action="store_true", help="Use parallel plate approximation.")
+    parser.add_argument("-F", "--no_peaks", action="store_true", help="Don't fit peaks in the loss")
     args = parser.parse_args()
 
     args_dict = vars(args)
@@ -77,7 +83,7 @@ def calibrate_capacitor():
     film_files = [Path(f).resolve() for f in args.film_file.split(",")]
 
     cal = Calibrate(film_files)
-    cal.load_calibration(bare_files, args.real_order, args.imaginary_order)
+    cal.load_calibration(bare_files, args.real_order, args.imaginary_order, peaks=not args.no_peaks)
     cal.run(args.film_thickness * 1e-9,
             args.gap_width * 1e-6,
             finger_num=args.finger_num,
@@ -98,7 +104,7 @@ def plot():
     parser.add_argument("-IL", "--imaginary_limits", help="ylim for imaginary part.")
     parser.add_argument("-TL", "--temperature_limit", type=float, default=None, help="Cut data below this temperature.")
     parser.add_argument("-S", "--save", help="Save with specified filename")
-    parser.add_argument("-DPI", "--dpi", type=int, default=100, help="Change DPI for saving image.")
+    parser.add_argument("-DPI", "--dpi", type=int, default=300, help="Change DPI for saving image.")
     args = parser.parse_args()
 
     files = [Path(f).resolve() for f in args.file_name.split(",")]
@@ -110,6 +116,9 @@ def plot():
     else:
         data = RawData(files)
     
+    if args.temperature_limit is not None:
+        data.set_temperature_cut(args.temperature_limit)
+
     fig, (ax_re, ax_im) = data.plot()
 
     if args.real_limits is not None:

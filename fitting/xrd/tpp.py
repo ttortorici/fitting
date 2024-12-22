@@ -4,6 +4,7 @@ from pathlib import Path
 import re
 from scipy.optimize import least_squares
 import matplotlib.pylab as plt
+plt.style.use("fitting.style")
 
 def help():
     print("To run fit on powder:")
@@ -454,7 +455,7 @@ class TPP:
                 ax.set_xlabel(self.xlabel, fontsize=12)
                 ax.set_ylabel(self.ylabel, fontsize=12)
                 ax.set_yscale("log")
-                ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+                # ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
                 ax.tick_params(axis="both", which="both", direction="in", top=True, right=True)
         fig.tight_layout()
         if len(axes) == 1:
@@ -577,7 +578,9 @@ class TPP:
         print(f"Chi-squared: {chi_sq:.3f}")
         dof = len(self.counts) - self.free_param_num
         print(f"Degrees of freedom: {dof}")
+        red_chi_sq = chi_sq / dof
         print(f"Reduced chi-squared: {chi_sq / dof:.3f}")
+        return red_chi_sq
         
     def remove_peak(self, h, k, l, mono=False, sector=None):
         if mono:
@@ -736,6 +739,16 @@ class TPP:
         self.mono_peak_heights = fit.x.reshape((len(fit.x), 1))
         return self.show_fit()
     
+    def get_params_hexagonal(self):
+        params = {
+            "a": float(self.hex[0]),
+            "c": float(self.hex[1]),
+            "grain": float(self.hex_params["grain"]),
+            "strain": float(self.hex_params["strain"]),
+            "goni": float(self.hex_params["goni"]),
+        }
+        return params
+    
     def fit_free_params(self, keys=None):
         free_parameters = list(self.hex)
         if keys is not None:
@@ -788,7 +801,7 @@ class TPP:
                 self.hex_params[key] = fit.x[2 + ii]
         self.hex_peak_heights = fit.x[N:].reshape((len(self.hex_peak_heights), 1))
         self.report_peaks()
-        return self.show_fit()
+        return self.show_fit(), (fit.x, std)
     
     def fit_free_params_monoclinic(self, keys=None):
         free_parameters = list(self.hex)            # 2
