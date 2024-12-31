@@ -62,11 +62,21 @@ class Calibrate:
                 finger_num=finger_num, delta_cap_real_err=del_cap_err_real, delta_cap_imag_err=del_cap_err_imag,
                 gap_err=gap_err, film_thickness_err=film_thickness_err, finger_length_err=finger_length_err
             )
+            _, (real_chi_std, imag_chi_std) = capacitor.susceptibility_pp(
+                del_cap_real, del_cap_imag, gap_width, film_thickness, finger_length=1e-3,
+                finger_num=finger_num, delta_cap_real_err=self.raw_data.cap_std, delta_cap_imag_err=cap_err_imag,
+                gap_err=0, film_thickness_err=0, finger_length_err=0
+            )
         else:
             (real_chi, imag_chi), (real_chi_err, imag_chi_err) = capacitor.susceptibility(
                 del_cap_real, del_cap_imag, gap_width, film_thickness, finger_length=1e-3,
                 finger_num=finger_num, delta_cap_real_err=del_cap_err_real, delta_cap_imag_err=del_cap_err_imag,
                 gap_err=gap_err, film_thickness_err=film_thickness_err, finger_length_err=finger_length_err
+            )
+            _, (real_chi_std, imag_chi_std) = capacitor.susceptibility(
+                del_cap_real, del_cap_imag, gap_width, film_thickness, finger_length=1e-3,
+                finger_num=finger_num, delta_cap_real_err=self.raw_data.cap_std, delta_cap_imag_err=cap_err_imag,
+                gap_err=0, film_thickness_err=0, finger_length_err=0
             )
 
         data_at_freq = [None] * self.raw_data.freq_num
@@ -110,10 +120,10 @@ class Calibrate:
                 del_cap_err_real[:, ff],
                 del_cap_imag[:, ff],                        # del C''
                 del_cap_err_imag[:, ff],
-                real_chi[:, ff],                            # real susceptibility
-                real_chi_err[:, ff],
-                imag_chi[:, ff],                            # imaginary susceptibility
-                imag_chi_err[:, ff],
+                real_chi[:, ff] + 1,                        # real dielectric
+                real_chi_std[:, ff],
+                imag_chi[:, ff],                            # imaginary dielectric
+                imag_chi_std[:, ff],
                 volt[:, ff],
                 np.ones(data_pts) * freq,
             ), axis=1)

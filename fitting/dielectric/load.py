@@ -391,8 +391,8 @@ class ProcessedFileLite(ProcessedFile):
     LABELS = ["Time [s]", "Temperature A [K]",
               "Delta C' [pF]", "Delta C' STD [pF]",
               "Delta C'' [pF]", "Delta C'' STD [pF]",
-              "Real Susceptibility", "Real Susceptibility STD",
-              "Imaginary Susceptibility", "Imaginary Susceptibility STD",
+              "Real Dielectric", "Real Dielectric STD",
+              "Imaginary Dielectric", "Imaginary Dielectric STD",
               "Voltage [V]", "Frequency [Hz]"]
 
     TIME_IND = 0
@@ -401,9 +401,9 @@ class ProcessedFileLite(ProcessedFile):
     DELCREERR_IND = 3
     DELCIM_IND = 4      # delta C''
     DELCIMERR_IND = 5
-    CHIRE_IND = 6       # electric susceptibility (real part)
+    CHIRE_IND = 6       # dielectric constant (real part)
     CHIREERR_IND = 7
-    CHIIM_IND = 8       # electric susceptibility (imaginary part)
+    CHIIM_IND = 8       # dielectric constant (imaginary part)
     CHIIMERR_IND = 9
     VOLT_IND = 10
     FREQ_IND = 11
@@ -426,6 +426,21 @@ class ProcessedFileLite(ProcessedFile):
         fig, axes = super().plot(figsize, vertical, plot_sus)
         return fig, axes
     
+    def get_dielectric_real(self):
+        inds = self.get_inds(self.CHIRE_IND)
+        return self.data[:, inds]
+    
+    def get_dielectric_real_errors(self):
+        inds = self.get_inds(self.CHIRE_IND)
+        return self.data[:, inds]
+    
+    def get_dielectric_imag(self):
+        inds = self.get_inds(self.CHIIM_IND)
+        return self.data[:, inds]
+    
+    def get_dielectric_imag_errors(self):
+        inds = self.get_inds(self.CHIIM_IND)
+        return self.data[:, inds]
 
 class RawData(RawFile):
 

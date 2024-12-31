@@ -88,13 +88,13 @@ class Bare:
 
     @staticmethod
     def fit_function_real(params, temperature):
-        c0 = np.array([params[:temperature.shape[1]]])
+        c0 = np.array(params[:temperature.shape[1]])
         ci = params[temperature.shape[1] - 1:]
         rt = 300.
         temp_rt = temperature - rt
-        poly = np.array(c0, dtype=np.float64) + ci[1] * temp_rt
-        for ii in range(2, len(ci)):
-            poly += ci[ii] * temp_rt ** ii
+        poly = np.array(c0, dtype=np.float64)
+        for ii in range(1, len(ci)):
+            poly = poly + ci[ii] * temp_rt ** ii
         return poly
 
     @classmethod
@@ -106,16 +106,17 @@ class Bare:
         # center = params[2]
         l0 = np.array([params[:temperature.shape[1]]])
 
-        li = params[temperature.shape[1] * 3:]
+        li = params[temperature.shape[1] * 3 - 1:]
 
         height = np.array(params[temperature.shape[1]:2*temperature.shape[1]])
         width = np.array(params[2*temperature.shape[1]:3*temperature.shape[1]])
         #center = params[3*temperature.shape[1]:4*temperature.shape[1]]
+
         t0 = 120.
         temp_t0 = temperature - t0
-        poly = np.array(l0, dtype=np.float64) + li[1] * temp_t0
-        for ii in range(2, len(li)):
-            poly += li[ii] * temp_t0 ** ii
+        poly = np.array(l0, dtype=np.float64)
+        for ii in range(1, len(li)):
+            poly = poly +  li[ii] * temp_t0 ** ii
         arg = (temperature - 14) / width
         return poly + height * np.exp(-0.5 * arg * arg)
     
@@ -130,7 +131,7 @@ class Bare:
         temp_t0 = temperature - t0
         poly = np.array(l0, dtype=np.float64)
         for ii in range(1, len(li)):
-            poly += li[ii] * temp_t0 ** ii
+            poly = poly + li[ii] * temp_t0 ** ii
         return poly
 
     @classmethod
@@ -282,14 +283,19 @@ class Bare:
         # print(" |")
 
     def show_fit(self, peaks: bool):
+        prop_cycle = plt.rcParams['axes.prop_cycle']
+        color = prop_cycle.by_key()['color']
         fig, axes = plt.subplots(2, 1, figsize=(6, 8))
         x = np.linspace(4, 400, 10000)
         x = np.dstack([x] * self.temp.shape[1])[0]
 
         fit_to_plot = self.fit_function_real(self._fit_real, x)
+        if fit_to_plot.ndim == 1:
+            fit_to_plot = np.tile(fit_to_plot, (x.shape[0], 1))
         for ii in range(self.fnum):
-            axes[0].plot(self.temp[:, ii], self.caps[:, ii], "x", label=f"{int(self.freq[ii])} Hz")
-            axes[0].plot(x, fit_to_plot[:, ii])
+            axes[0].scatter(self.temp[:, ii], self.caps[:, ii],
+                            s=3, edgecolor=color[ii], facecolor='w', label=f"{int(self.freq[ii])} Hz")
+            axes[0].plot(x, fit_to_plot[:, ii], color[ii])
         
         if peaks:
             fit_to_plot = self.fit_function_imag_peaks(self._fit_imag, x)
@@ -298,8 +304,9 @@ class Bare:
             if fit_to_plot.shape[0] == 1:
                 fit_to_plot = np.tile(fit_to_plot, (x.shape[0], 1))
         for ii in range(self.fnum):
-            axes[1].plot(self.temp[:, ii], self.loss[:, ii], "x", label=f"{int(self.freq[ii])} Hz")
-            axes[1].plot(x, fit_to_plot[:, ii])
+            axes[1].scatter(self.temp[:, ii], self.loss[:, ii],
+                            s=3, edgecolor=color[ii], facecolor='w', label=f"{int(self.freq[ii])} Hz")
+            axes[1].plot(x, fit_to_plot[:, ii], color[ii])
 
         for ax in axes:
             ax.grid()
