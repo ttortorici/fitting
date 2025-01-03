@@ -20,8 +20,8 @@ class Calibrate:
         self.bare_loss_std = None       # will be a 1D array of length frequency_num
         self.raw_data = RawData(film_data_file)
 
-    def load_calibration(self, file: Path, real_poly_order: int, imaginary_poly_order: int, peaks: bool):
-        bare = Bare(file)
+    def load_calibration(self, file: Path, real_poly_order: int, imaginary_poly_order: int, peaks: bool, max_temperature_fit: float):
+        bare = Bare(file, max_temperature_fit)
         bare.fit(real_order=real_poly_order, imag_order=imaginary_poly_order, peaks=peaks)
         bare.show_fit(peaks=peaks)
         temperature = self.raw_data.get_temperatures()
@@ -36,7 +36,8 @@ class Calibrate:
         self.bare_loss_dev = bare.standard_dev_imag
 
     def run(self, film_thickness: float, gap_width: float, finger_num: int=50, gap_err: float=0,
-            film_thickness_err: float=0, finger_length_err: float=0, parallel_plate: bool=False):
+            film_thickness_err: float=0, finger_length_err: float=0, max_temperature_data: float=None):
+        temperature_mask = np.all(self.raw_data.get_temperatures() < max_temperature_data, axis=1)
         data_pts = self.raw_data.shape[0]       # number of rows
         print(f"num data: {data_pts}")
         time = self.raw_data.get_times()
@@ -56,28 +57,13 @@ class Calibrate:
         del_cap_real = (caps - self.bare_cap_curve)     # pF
         del_cap_imag = (cap_imag - cap_bare_imag)       # pF
 
-        if parallel_plate:
-            (real_chi, imag_chi), (real_chi_err, imag_chi_err) = capacitor.susceptibility_pp(
-                del_cap_real, del_cap_imag, gap_width, film_thickness, finger_length=1e-3,
-                finger_num=finger_num, delta_cap_real_err=del_cap_err_real, delta_cap_imag_err=del_cap_err_imag,
-                gap_err=gap_err, film_thickness_err=film_thickness_err, finger_length_err=finger_length_err
-            )
-            _, (real_chi_std, imag_chi_std) = capacitor.susceptibility_pp(
-                del_cap_real, del_cap_imag, gap_width, film_thickness, finger_length=1e-3,
-                finger_num=finger_num, delta_cap_real_err=self.raw_data.cap_std, delta_cap_imag_err=cap_err_imag,
-                gap_err=0, film_thickness_err=0, finger_length_err=0
-            )
-        else:
-            (real_chi, imag_chi), (real_chi_err, imag_chi_err) = capacitor.susceptibility(
-                del_cap_real, del_cap_imag, gap_width, film_thickness, finger_length=1e-3,
-                finger_num=finger_num, delta_cap_real_err=del_cap_err_real, delta_cap_imag_err=del_cap_err_imag,
-                gap_err=gap_err, film_thickness_err=film_thickness_err, finger_length_err=finger_length_err
-            )
-            _, (real_chi_std, imag_chi_std) = capacitor.susceptibility(
-                del_cap_real, del_cap_imag, gap_width, film_thickness, finger_length=1e-3,
-                finger_num=finger_num, delta_cap_real_err=self.raw_data.cap_std, delta_cap_imag_err=cap_err_imag,
-                gap_err=0, film_thickness_err=0, finger_length_err=0
-            )
+        (eps_real, eps_imag), (eps_real_err, eps_imag_err) = capacitor.dielectric_constant(
+            del_cap_real, del_cap_imag, gap_width, film_thickness, finger_length=1e-3,
+            finger_num=finger_num, delta_cap_real_err=del_cap_err_real, delta_cap_imag_err=del_cap_err_imag,
+            gap_err=gap_err, film_thickness_err=film_thickness_err, finger_length_err=finger_length_err
+        )
+
+        eps_real_std, eps_imag_std = self.raw_data.determine_variance(15, 1, eps_real, eps_imag)
 
         data_at_freq = [None] * self.raw_data.freq_num
         data_at_freq_lite = [None] * self.raw_data.freq_num
@@ -106,26 +92,28 @@ class Calibrate:
                 cap_err_bare_imag[:, ff],
                 del_cap_imag[:, ff],                        # del C''
                 del_cap_err_imag[:, ff],
-                real_chi[:, ff],                            # real susceptibility
-                real_chi_err[:, ff],
-                imag_chi[:, ff],                            # imaginary susceptibility
-                imag_chi_err[:, ff],
+                eps_real[:, ff],                            # real dielectric constant
+                eps_real_std[:, ff],
+                eps_real_err[:, ff],
+                eps_imag[:, ff],                            # imaginary dielectric constant
+                eps_imag_std[:, ff],
+                eps_imag_err[:, ff],
                 volt[:, ff],
                 np.ones(data_pts) * freq,
             ), axis=1)
             data_at_freq_lite[ff] = np.stack((
-                time[:, ff],
-                temp[:, ff],
-                caps[:, ff] - self.bare_cap_curve[:, ff],   # del C'          
-                del_cap_err_real[:, ff],
-                del_cap_imag[:, ff],                        # del C''
-                del_cap_err_imag[:, ff],
-                real_chi[:, ff] + 1,                        # real dielectric
-                real_chi_std[:, ff],
-                imag_chi[:, ff],                            # imaginary dielectric
-                imag_chi_std[:, ff],
-                volt[:, ff],
-                np.ones(data_pts) * freq,
+                time[temperature_mask][:, ff],
+                temp[temperature_mask][:, ff],
+                caps[temperature_mask][:, ff] - self.bare_cap_curve[temperature_mask][:, ff],   # del C'          
+                del_cap_err_real[temperature_mask][:, ff],
+                del_cap_imag[temperature_mask][:, ff],                        # del C''
+                del_cap_err_imag[temperature_mask][:, ff],
+                eps_real[temperature_mask][:, ff],                            # real dielectric constant
+                eps_real_std[temperature_mask][:, ff],
+                eps_imag[temperature_mask][:, ff],                            # imaginary dielectric constant
+                eps_imag_std[temperature_mask][:, ff],
+                volt[temperature_mask][:, ff],
+                np.ones(np.sum(temperature_mask)) * freq,
             ), axis=1)
         data = np.hstack(data_at_freq)
         data_lite = np.hstack(data_at_freq_lite)

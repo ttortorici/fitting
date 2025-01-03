@@ -3,6 +3,7 @@ from scipy.special import ellipk
 
 
 EPS0 = 8.85418782 # pf/m
+LOG_PI_CORR = np.log(16) / np.pi
 
 
 def elliptic_modulus(gap, film_thickness, unit_cell):
@@ -73,6 +74,45 @@ def geometry_parallel_plate(gap: float, film_thickness: float, unit_cell: float=
 
 def bare(gap: float, unit_cell: float=20, silica_constant: float=3.9, finger_length:float=1e-3, finger_num: int=50):
     return EPS0 * geometry_thick_film(gap, 500, unit_cell, finger_length, finger_num) * (1 + silica_constant)
+
+def dielectric_constant(delta_cap_real: float, delta_cap_imag: float, gap: float, film_thickness: float,
+                        finger_length:float = 1e-3, finger_num: int=50,
+                        delta_cap_real_err: float=0., delta_cap_imag_err: float=0., gap_err: float=0.,
+                        film_thickness_err: float=0., finger_length_err: float=0.):
+    inv_Cx = (LOG_PI_CORR + gap / film_thickness) / (EPS0 * (finger_num - 1) * finger_length)
+    eps_real = delta_cap_real * inv_Cx + 1
+    eps_imag = delta_cap_imag * inv_Cx
+
+    inv_Cx_no_corr = gap / (EPS0 * (finger_num - 1) * finger_length * film_thickness)
+    der_cap = inv_Cx
+    der_len_real = eps_real / finger_length
+    der_len_imag = eps_imag / finger_length
+    der_gap_real = inv_Cx_no_corr * delta_cap_real / gap
+    der_gap_imag = inv_Cx_no_corr * delta_cap_imag / gap
+    der_thk_real = inv_Cx_no_corr * delta_cap_real / film_thickness
+    der_thk_imag = inv_Cx_no_corr * delta_cap_imag / film_thickness
+    term_cap_real = delta_cap_real_err * der_cap
+    term_cap_real *= term_cap_real
+    term_cap_imag = delta_cap_imag_err * der_cap
+    term_cap_imag *= term_cap_imag
+    term_len_real = finger_length_err * der_len_real
+    term_len_real *= term_len_real
+    term_len_imag = finger_length_err * der_len_imag
+    term_len_imag *= term_len_imag
+    term_gap_real = gap_err * der_gap_real
+    term_gap_real *= term_gap_real
+    term_gap_imag = gap_err * der_gap_imag
+    term_gap_imag *= term_gap_imag
+    term_thk_real = film_thickness_err * der_thk_real
+    term_thk_real *= term_thk_real
+    term_thk_imag = film_thickness_err * der_thk_imag
+    term_thk_imag *= term_thk_imag
+
+    # error
+    real_err = np.sqrt(term_cap_real + term_len_real + term_gap_real + term_thk_real)
+    imag_err = np.sqrt(term_cap_imag + term_len_imag + term_gap_imag + term_thk_imag)
+
+    return (eps_real, eps_imag), (real_err, imag_err)
 
 def susceptibility_pp(delta_cap_real: float, delta_cap_imag: float, gap: float, film_thickness: float,
                    unit_cell: float=20, finger_length:float = 1e-3, finger_num: int=50,

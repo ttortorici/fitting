@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fitting"
-version = "2.1"
+version = "2.2"
 description = "Least squares fitting of data to various models for my PhD thesis"
 authors = [
     { name = "Teddy Tortorici", email = "edward.tortorici@colorado.edu" }

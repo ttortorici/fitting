@@ -22,6 +22,8 @@ class RawFile:
             for file in files[1:]:
                 self.data = np.append(self.data, self.loadtxt(file), axis=0)
         self.shape = self.data.shape
+        self.cap_std = None
+        self.loss_std = None
 
         self.freq_num = int(self.shape[1] / self.COLS_PER)
         self.freqs = [self.data[0, index] for index in self.get_inds(self.FREQ_IND)]
@@ -29,6 +31,11 @@ class RawFile:
     def set_temperature_cut(self, temperature: float):
         mask = np.all(self.get_temperatures() < temperature, axis=1)
         self.data = self.data[mask]
+        self.shape = self.data.shape
+        if self.cap_std is not None:
+            self.cap_std = self.cap_std[mask]
+        if self.loss_std is not None:
+            self.loss_std = self.loss_std[mask]
 
     def determine_ascending(self):
         derivative = self.calc_time_derivatives()
@@ -52,12 +59,14 @@ class RawFile:
         print(f"now is shape: {self.data.shape}")
         self.shape = self.data.shape
 
-    def determine_variance(self, slice_size: int, poly_order: int):
+    def determine_variance(self, slice_size: int, poly_order: int, real=None, imaginary=None):
         params_c = [0] * (poly_order + 1)
         params_l = params_c.copy()
         times = self.get_times()
-        capacitances = self.get_capacitances()
-        losstangents = self.get_losses()
+        if real is None:
+            real = self.get_capacitances()
+        if imaginary is None:
+            imaginary = self.get_losses()
         slices = np.arange(0, len(times), slice_size)
         if len(times) - slices[-1] > poly_order:
             slices = np.append(slices, len(times))
@@ -68,8 +77,8 @@ class RawFile:
         std_devs_l = np.empty_like(times)
         for ff, freq in enumerate(self.freqs):
             time = times[:, ff]
-            capacitance = capacitances[:, ff]
-            losstangent = losstangents[:, ff]
+            capacitance = real[:, ff]
+            losstangent = imaginary[:, ff]
             for ss in range(len(slices) - 1):
                 time_slice = time[slices[ss] : slices[ss + 1]]
                 capt_slice = capacitance[slices[ss] : slices[ss + 1]]
@@ -220,8 +229,8 @@ class ProcessedFile(RawFile):
               "C'' [pF]", "C'' STD [PF]",
               "Bare C'' [pF]", "Bare C'' STD [pF]",
               "Delta C'' [pF]", "Delta C'' STD [pF]",
-              "Real Susceptibility", "Real Susceptibility STD",
-              "Imaginary Susceptibility", "Imaginary Susceptibility STD",
+              "Real Dielectric Constant", "Real Dielectric Constant STD", "Real Dielectric Constant Error",
+              "Imaginary Dielectric Constant", "Imaginary Dielectric Constant STD", "Imaginary Dielectric Constant Error",
               "Voltage [V]", "Frequency [Hz]"]
 
     TIME_IND = 0
@@ -243,13 +252,15 @@ class ProcessedFile(RawFile):
     BARECIMERR_IND = 16
     DELCIM_IND = 17     # delta C''
     DELCIMERR_IND = 18
-    CHIRE_IND = 19      # electric susceptibility (real part)
-    CHIREERR_IND = 20
-    CHIIM_IND = 21      # electric susceptibility (imaginary part)
-    CHIIMERR_IND = 22
-    VOLT_IND = 23
-    FREQ_IND = 24
-    COLS_PER = 25
+    EPSRE_IND = 19      # electric susceptibility (real part)
+    EPSRESTD_IND = 20
+    EPSREERR_IND = 21
+    EPSIM_IND = 22      # electric susceptibility (imaginary part)
+    EPSIMSTD_IND = 23
+    EPSIMERR_IND = 24
+    VOLT_IND = 25
+    FREQ_IND = 26
+    COLS_PER = 27
 
     def get_capacitance_errors(self):
         inds = self.get_inds(self.CAPERR_IND)
@@ -308,19 +319,51 @@ class ProcessedFile(RawFile):
         return self.data[:, inds]
     
     def get_real_susceptibilities(self):
-        inds = self.get_inds(self.CHIRE_IND)
+        inds = self.get_inds(self.EPSRE_IND)
         return self.data[:, inds]
     
     def get_real_susceptibility_errors(self):
-        inds = self.get_inds(self.CHIRE_IND)
+        inds = self.get_inds(self.EPSREERR_IND)
+        return self.data[:, inds]
+    
+    def get_real_susceptibility_std(self):
+        inds = self.get_inds(self.EPSRESTD_IND)
         return self.data[:, inds]
     
     def get_imaginary_susceptibilities(self):
-        inds = self.get_inds(self.CHIIM_IND)
+        inds = self.get_inds(self.EPSIM_IND)
         return self.data[:, inds]
     
     def get_imaginary_susceptibility_errors(self):
-        inds = self.get_inds(self.CHIIM_IND)
+        inds = self.get_inds(self.EPSIMERR_IND)
+        return self.data[:, inds]
+    
+    def get_imaginary_susceptibility_std(self):
+        inds = self.get_inds(self.EPSIMSTD_IND)
+        return self.data[:, inds]
+    
+    def get_dielectric_real(self):
+        inds = self.get_inds(self.EPSRE_IND)
+        return self.data[:, inds]
+    
+    def get_dielectric_real_errors(self):
+        inds = self.get_inds(self.EPSREERR_IND)
+        return self.data[:, inds]
+    
+    def get_dielectric_real_std(self):
+        inds = self.get_inds(self.EPSRESTD_IND)
+        return self.data[:, inds]
+    
+    def get_dielectric_imag(self):
+        inds = self.get_inds(self.EPSIM_IND)
+        return self.data[:, inds]
+    
+    def get_dielectric_imag_errors(self):
+        inds = self.get_inds(self.EPSIMERR_IND)
+        return self.data[:, inds]
+    
+    def get_dielectric_imag_std(self):
+        inds = self.get_inds(self.EPSIMSTD_IND)
         return self.data[:, inds]
     
     def plot(self, figsize=None, vertical=True, plot_sus=False):
@@ -391,8 +434,8 @@ class ProcessedFileLite(ProcessedFile):
     LABELS = ["Time [s]", "Temperature A [K]",
               "Delta C' [pF]", "Delta C' STD [pF]",
               "Delta C'' [pF]", "Delta C'' STD [pF]",
-              "Real Dielectric", "Real Dielectric STD",
-              "Imaginary Dielectric", "Imaginary Dielectric STD",
+              "Real Dielectric Constant", "Real Dielectric Constant STD",
+              "Imaginary Dielectric Constant", "Imaginary Dielectric Constant STD",
               "Voltage [V]", "Frequency [Hz]"]
 
     TIME_IND = 0
@@ -401,10 +444,10 @@ class ProcessedFileLite(ProcessedFile):
     DELCREERR_IND = 3
     DELCIM_IND = 4      # delta C''
     DELCIMERR_IND = 5
-    CHIRE_IND = 6       # dielectric constant (real part)
-    CHIREERR_IND = 7
-    CHIIM_IND = 8       # dielectric constant (imaginary part)
-    CHIIMERR_IND = 9
+    EPSRE_IND = 6       # dielectric constant (real part)
+    EPSRESTD_IND = 7
+    EPSIM_IND = 8       # dielectric constant (imaginary part)
+    EPSIMSTD_IND = 9
     VOLT_IND = 10
     FREQ_IND = 11
     COLS_PER = 12
@@ -425,22 +468,6 @@ class ProcessedFileLite(ProcessedFile):
     def plot(self, figsize=None, vertical=True, plot_sus=True):
         fig, axes = super().plot(figsize, vertical, plot_sus)
         return fig, axes
-    
-    def get_dielectric_real(self):
-        inds = self.get_inds(self.CHIRE_IND)
-        return self.data[:, inds]
-    
-    def get_dielectric_real_errors(self):
-        inds = self.get_inds(self.CHIRE_IND)
-        return self.data[:, inds]
-    
-    def get_dielectric_imag(self):
-        inds = self.get_inds(self.CHIIM_IND)
-        return self.data[:, inds]
-    
-    def get_dielectric_imag_errors(self):
-        inds = self.get_inds(self.CHIIM_IND)
-        return self.data[:, inds]
 
 class RawData(RawFile):
 

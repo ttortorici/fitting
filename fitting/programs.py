@@ -67,8 +67,9 @@ def calibrate_capacitor():
     parser.add_argument("-TE", "--thickness_error", type=float, default=5., help="Estimated film thickness error in nanometers.")
     parser.add_argument("-GE", "--gap_error", type=float, default=0.1, help="Estimated error of the gap width in microns.")
     parser.add_argument("-FE", "--finger_length_error", type=float, default=0., help="Experimental error of the finger length in microns (should be roughly half the over-etching).")
-    parser.add_argument("-M", "--max_temperature", help="Cut off temperatures above this value (in K).")
-    parser.add_argument("-pp", "--parallel_plate", action="store_true", help="Use parallel plate approximation.")
+    parser.add_argument("-MF", "--max_temperature_fit", type=float, help="Cut off temperatures above this value (in K).")
+    parser.add_argument("-MD", "--max_temperature_data", type=float, help="Cut off temperatures in Lite file (in K)")
+    # parser.add_argument("-pp", "--parallel_plate", action="store_true", help="Use parallel plate approximation.")
     parser.add_argument("-F", "--no_peaks", action="store_true", help="Don't fit peaks in the loss")
     args = parser.parse_args()
 
@@ -83,14 +84,15 @@ def calibrate_capacitor():
     film_files = [Path(f).resolve() for f in args.film_file.split(",")]
 
     cal = Calibrate(film_files)
-    cal.load_calibration(bare_files, args.real_order, args.imaginary_order, peaks=not args.no_peaks)
+    cal.load_calibration(bare_files, args.real_order, args.imaginary_order, peaks=not args.no_peaks,
+                         max_temperature_fit=args.max_temperature_fit)
     cal.run(args.film_thickness * 1e-9,
             args.gap_width * 1e-6,
             finger_num=args.finger_num,
             gap_err=args.gap_error * 1e-6,
             film_thickness_err=args.thickness_error * 1e-9,
             finger_length_err=args.finger_length_error * 1e-6,
-            parallel_plate=args.parallel_plate)
+            max_temperature_data=args.max_temperature_data)
 
 
 def plot():
