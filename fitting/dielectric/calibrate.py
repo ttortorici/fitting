@@ -37,7 +37,11 @@ class Calibrate:
 
     def run(self, film_thickness: float, gap_width: float, finger_num: int=50, gap_err: float=0,
             film_thickness_err: float=0, finger_length_err: float=0, max_temperature_data: float=None):
-        temperature_mask = np.all(self.raw_data.get_temperatures() < max_temperature_data, axis=1)
+        if max_temperature_data is not None:
+            temperature_mask = np.all(self.raw_data.get_temperatures() < max_temperature_data, axis=1)
+        else:
+            temperature_mask = np.ones(self.raw_data.shape[0], dtype=bool)
+
         data_pts = self.raw_data.shape[0]       # number of rows
         print(f"num data: {data_pts}")
         time = self.raw_data.get_times()
