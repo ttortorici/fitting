@@ -4,7 +4,25 @@ from scipy.optimize import least_squares
 import matplotlib.pylab as plt
 plt.style.use("fitting.style")
 
-class RawFile:
+class File:
+    @staticmethod
+    def loadtxt(filename: str) -> np.ndarray:
+        return np.loadtxt(filename, comments="#", delimiter=",", skiprows=3, dtype=np.float64)
+    
+    @staticmethod
+    def poly_fit(params: list, temperature: np.ndarray) -> np.ndarray:
+        center = 0.5 * (temperature.max() - temperature.min())
+        temp_rt = temperature - center
+        poly = params[0]
+        for ii, p in enumerate(params[1:]):
+            poly += p * temp_rt ** (ii + 1)
+        return poly
+    
+    @classmethod
+    def residuals(cls, params: list, x_data: np.ndarray, y_data: np.ndarray):
+        return (cls.poly_fit(params, x_data) - y_data).flatten("F")
+
+class RawFile(File):
     TIME_IND = 0
     TEMPA_IND = 1
     TEMPB_IND = 2
@@ -107,19 +125,6 @@ class RawFile:
                 std_devs_l[slices[ss]: slices[ss + 1], ff] = np.sqrt(variance_l)
         return std_devs_c, std_devs_l
     
-    @staticmethod
-    def poly_fit(params: list, temperature: np.ndarray) -> np.ndarray:
-        center = 0.5 * (temperature.max() - temperature.min())
-        temp_rt = temperature - center
-        poly = params[0]
-        for ii, p in enumerate(params[1:]):
-            poly += p * temp_rt ** (ii + 1)
-        return poly
-    
-    @classmethod
-    def residuals(cls, params: list, x_data: np.ndarray, y_data: np.ndarray):
-        return (cls.poly_fit(params, x_data) - y_data).flatten("F")
-    
     def get_inds(self, col_ind):
         return [col_ind + self.COLS_PER * ii for ii in range(self.freq_num)]
     
@@ -221,11 +226,6 @@ class RawFile:
         ax_im.legend()
         fig.tight_layout()
         return fig, (ax_re, ax_im)
-
-
-    @staticmethod
-    def loadtxt(filename: str) -> np.ndarray:
-        return np.loadtxt(filename, comments="#", delimiter=",", skiprows=3, dtype=np.float64)
 
 
 class ProcessedFile(RawFile):
@@ -481,6 +481,7 @@ class ProcessedFileLite(ProcessedFile):
         fig, axes = super().plot(figsize, vertical, plot_sus)
         return fig, axes
 
+
 class RawData(RawFile):
 
     def __init__(self, files):
@@ -488,6 +489,115 @@ class RawData(RawFile):
         # self.determine_ascending()
         self.cap_std, self.loss_std = self.determine_variance(10, 1)
         self.time_derivative_filter()
+
+class ProcessedPowder(RawFile):
+    LABELS = ["Time [s]", "Temperature A [K]", "Temperature B [K]",
+              "Capacitance [pF]", "Cap STD [pF]",
+              "Bare Cap Curves [pF]", "Bare Cap STD [pF]",
+              "Delta C' [pF]", "Delta C' STD [pF]",
+              "Loss Tangent", "Loss Tangent STD",
+              "Bare Loss", "Bare Loss STD",
+              "C'' [pF]", "C'' STD [PF]",
+              "Bare C'' [pF]", "Bare C'' STD [pF]",
+              "Delta C'' [pF]", "Delta C'' STD [pF]",
+              "Real Dielectric Constant", "Real Dielectric Constant STD", "Real Dielectric Constant Error",
+              "Imaginary Dielectric Constant", "Imaginary Dielectric Constant STD", "Imaginary Dielectric Constant Error",
+              "Voltage [V]", "Frequency [Hz]"]
+
+    TIME_IND = 0
+    TEMPA_IND = 1
+    TEMPB_IND = 2
+    CAP_IND = 3         # measured capacitance
+    CAPERR_IND = 4
+    BAREC_IND = 5       # fitted bare capacitance
+    BARECERR_IND = 6
+    DELCRE_IND = 7      # delta C'
+    DELCREERR_IND = 8
+    LOSS_IND = 9        # measured loss
+    LOSSERR_IND = 10
+    BAREL_IND = 11      # fitted bare loss
+    BARELERR_IND = 12
+    CAPIM_IND = 13      # C''
+    CAPIMERR_IND = 14
+    BARECIM_IND = 15    # bare C''
+    BARECIMERR_IND = 16
+    DELCIM_IND = 17     # delta C''
+    DELCIMERR_IND = 18
+    EPSRE_IND = 19      # electric susceptibility (real part)
+    EPSRESTD_IND = 20
+    EPSREERR_IND = 21
+    EPSIM_IND = 22      # electric susceptibility (imaginary part)
+    EPSIMSTD_IND = 23
+    EPSIMERR_IND = 24
+    VOLT_IND = 25
+    FREQ_IND = 26
+    COLS_PER = 27
+
+
+class Unsorted(File):
+
+    def __init__(self, files: Path, room_temperature_capacitance: float = None, linear_term: float = 0., quadratic_term: float = 0.):
+        if isinstance(files, Path) or isinstance(files, str):
+            self.data = self.loadtxt(files)
+            file_for_header = files
+        elif isinstance(files, list) or isinstance(files, tuple):
+            self.data = self.loadtxt(files[0])
+            for file in files[1:]:
+                self.data = np.append(self.data, self.loadtxt(file), axis=0)
+            file_for_header = files[0]
+        with open(file_for_header, "r") as f:
+            for ii in range(3):
+                line = f.readline()
+                if ii == 2:
+                    column_titles = line.strip("\n").split(", ")
+        freq_col = None
+        self.cap_ind = None
+        self.loss_ind = None
+        self.time_ind = None
+        self.temp_ind = None
+        for ii, label in enumerate(column_titles):
+            if "Capacitance" in label:
+                self.cap_ind = ii
+            elif "Loss" in label:
+                self.loss_ind = ii
+            elif "Time" in label:
+                self.time_ind = ii
+            elif "Temperature A" in label:
+                self.temp_ind = ii
+            elif "Frequency" in label:
+                freq_col = ii
+        frequencies_full = self.data[:, freq_col]
+        self.freqs = []
+        for freq in frequencies_full:
+            freq = int(freq)
+            if freq not in self.freqs:
+                self.freqs.append(freq)
+            else:
+                break
+        self.freq_num = len(self.freqs)
+        self.data = self.data[:, :len(self.data) - len(self.data) % self.freq_num] # trim extra data that doesn't cycle through all the frequencies
+        
+        self.shape = self.data.shape
+        print(self.shape)
+    
+    def get_capacitances(self):
+        return self.get_from_ind(self.cap_ind)
+
+    def get_losses(self):
+        return self.get_from_ind(self.loss_ind)
+    
+    def get_imaginary_capacitances(self):
+        return self.get_capacitances() * self.get_losses()
+    
+    def get_times(self):
+        return self.get_from_ind(self.time_ind)
+    
+    def get_temperatures(self):
+        return self.get_from_ind(self.temp_ind)
+    
+    def get_from_ind(self, index):
+        column = self.data[:, index]
+        return np.column_stack([column[ii::3] for ii in range(self.freq_num)])
 
 
 def reverse_freqs_in_data_set(file: Path):
@@ -558,4 +668,3 @@ if __name__ == "__main__":
     data.plot(real_imaginary=True)
 
     plt.show()
-    
