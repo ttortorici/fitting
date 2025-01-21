@@ -491,18 +491,12 @@ class RawData(RawFile):
         self.time_derivative_filter()
 
 class ProcessedPowder(RawFile):
-    LABELS = ["Time [s]", "Temperature A [K]", "Temperature B [K]",
-              "Capacitance [pF]", "Cap STD [pF]",
-              "Bare Cap Curves [pF]", "Bare Cap STD [pF]",
+    LABELS = ["Time [s]", "Temperature A [K]",
+              "Capacitance [pF]",
+              "Loss Tangent",
               "Delta C' [pF]", "Delta C' STD [pF]",
-              "Loss Tangent", "Loss Tangent STD",
-              "Bare Loss", "Bare Loss STD",
-              "C'' [pF]", "C'' STD [PF]",
-              "Bare C'' [pF]", "Bare C'' STD [pF]",
-              "Delta C'' [pF]", "Delta C'' STD [pF]",
-              "Real Dielectric Constant", "Real Dielectric Constant STD", "Real Dielectric Constant Error",
-              "Imaginary Dielectric Constant", "Imaginary Dielectric Constant STD", "Imaginary Dielectric Constant Error",
-              "Voltage [V]", "Frequency [Hz]"]
+              "C'' [pF]", "C'' STD [pF]",
+              "Frequency [Hz]"]
 
     TIME_IND = 0
     TEMPA_IND = 1

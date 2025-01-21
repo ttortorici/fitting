@@ -1,6 +1,7 @@
 from fitting.dielectric.bare import Bare
 from fitting.dielectric.load import RawData, ProcessedFile, ProcessedFileLite
 from fitting.dielectric.calibrate import Calibrate
+from fitting.dielectric.powder import Powder
 from pathlib import Path
 from datetime import datetime
 import matplotlib.pylab as plt
@@ -54,7 +55,7 @@ def bare_fit():
 def calibrate_capacitor():
     parser = argparse.ArgumentParser(
         prog="calibrate-capacitor",
-        description="Process a calibrated data set with real and imaginary electric susceptibility",
+        description="Process a calibrated data set with real and imaginary dielectric constant",
         epilog="author: Teddy Tortorici <edward.tortorici@colorado.edu"
     )
     parser.add_argument("bare_file", help="The CSV file containing bare capacitance data.")
@@ -93,6 +94,33 @@ def calibrate_capacitor():
             film_thickness_err=args.thickness_error * 1e-9,
             finger_length_err=args.finger_length_error * 1e-6,
             max_temperature_data=args.max_temperature_data)
+    
+
+def process_powder():
+    parser = argparse.ArgumentParser(
+        prog="process-powder",
+        description="Process powder data",
+        epilog="author: Teddy Tortorici <edward.tortorici@colorado.edu"
+    )
+    parser.add_argument("powder_file", help="The CSV file containing powder capacitance measurement data.")
+    parser.add_argument("-B", "--bare", type=float, help="Measured bare capacitance at room temperature")
+    parser.add_argument("-L", "--linear", type=float, default=2.3e-5, help="Linear dependence of the capacitance")
+    parser.add_argument("-Q", "--quadratic", type=float, default=3e-8, help="Quadratic dependence of the capacitance")
+    parser.add_argument("-MD", "--max_temperature_data", type=float, help="Cut off temperatures in Lite file (in K)")
+    parser.add_argument("-S", "--sorted", action="store_true", help="Use this flag if the data is already sorted (unique columns for each frequency).")
+    args = parser.parse_args()
+
+    args_dict = vars(args)
+
+    now = datetime.now()
+
+    with open(f"powder-process-{now.year}-{now.month:02}-{now.day:02}_{now.hour:02}-{now.minute:02}.toml", "w") as toml_file:
+        toml.dump(args_dict, toml_file)
+
+    powder_files = [Path(f).resolve() for f in args.powder_file.split(",")]
+
+    pow = Powder(powder_files, args.bare, args.linear, args.quadratic, args.sorted)
+    pow.run(max_temperature_data=args.max_temperature_data)
 
 
 def plot():

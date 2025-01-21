@@ -16,13 +16,18 @@ superscript = ["\u2070", "\u00B9", "\u00B2", "\u00B3", "\u2074",
 
 
 class Powder:
-    def __init__(self, data_files: list[Path], room_temperature_capacitance: float = None, linear_term: float = 2.3e-5, quadratic_term: float = 3e-8, sorted=False):
+    def __init__(self, data_files: list[Path], room_temperature_capacitance: float = None, linear_term: float = 2.3e-5, quadratic_term: float = 3e-8, already_sorted=False):
         print("Loading Powder data. Loading data from file(s):")
-        self.sorted = sorted
+        self.sorted = already_sorted
         if isinstance(data_files, str):
             data_files = Path(data_files)
         if isinstance(data_files, Path):
             data_files = [data_files,]
+            self.dir = data_files.parent
+            self.name = data_files.stem
+        else:
+            self.dir = data_files[0].parent
+            self.name = data_files[0].stem
         for file in data_files:
             if isinstance(data_files, str):
                 print(f' - "{file}"')
@@ -55,6 +60,8 @@ class Powder:
             temperatures_300 = self.temp - 300.
             self.bare = np.ones_like(temperatures_300) * room_temperature_capacitance * (1
                             + linear_term * temperatures_300 + quadratic_term * temperatures_300 * temperatures_300)
+            self.real_shift = self.caps - self.bare
+            self.imag_shift = self.caps * self.loss
         self.std_real, self.std_imag = self.determine_variance(10, 1)
         print(self.std_real)
         self.std_real_p2p, self.std_imag_p2p = self.determine_variance_pt2pt(10)
@@ -76,100 +83,40 @@ class Powder:
 
     def run(self, max_temperature_data: float=None):
         if max_temperature_data is not None:
-            temperature_mask = np.all(self.raw_data.get_temperatures() < max_temperature_data, axis=1)
+            temperature_mask = np.all(self.temp < max_temperature_data, axis=1)
         else:
-            temperature_mask = np.ones(self.raw_data.shape[0], dtype=bool)
+            temperature_mask = np.ones(self.temp.shape[0], dtype=bool)
 
-        data_pts = self.raw_data.shape[0]       # number of rows
+        data_pts = len(self.time)       # number of rows
         print(f"num data: {data_pts}")
-        time = self.raw_data.get_times()
-        temp = self.raw_data.get_temperatures()
-        tempb = self.raw_data.get_shield_temperatures()
-        caps = self.raw_data.get_capacitances()
 
-        loss = self.raw_data.get_losses()
-        volt = self.raw_data.get_voltages()
-        cap_imag = caps * loss
-        cap_bare_imag = self.bare_cap_curve * self.bare_loss_curve
-        cap_err_imag = np.sqrt((self.raw_data.cap_std * loss)**2 + (self.raw_data.loss_std * caps)**2)
-        cap_err_bare_imag = np.sqrt((self.bare_cap_dev * self.bare_loss_curve)**2 + (self.bare_loss_dev * self.bare_cap_curve)**2)
-        del_cap_err_real = np.sqrt(self.raw_data.cap_std * self.raw_data.cap_std + self.bare_cap_dev * self.bare_cap_dev)
-        del_cap_err_imag = np.sqrt(cap_err_imag * cap_err_imag + cap_err_bare_imag * cap_err_bare_imag)
-        
-        del_cap_real = (caps - self.bare_cap_curve)     # pF
-        del_cap_imag = (cap_imag - cap_bare_imag)       # pF
-
-        (eps_real, eps_imag), (eps_real_err, eps_imag_err) = capacitor.dielectric_constant(
-            del_cap_real, del_cap_imag, gap_width, film_thickness, finger_length=1e-3,
-            finger_num=finger_num, delta_cap_real_err=del_cap_err_real, delta_cap_imag_err=del_cap_err_imag,
-            gap_err=gap_err, film_thickness_err=film_thickness_err, finger_length_err=finger_length_err
-        )
-
-        eps_real_std, eps_imag_std = self.raw_data.determine_variance(15, 1, eps_real, eps_imag)
-
-        data_at_freq = [None] * self.raw_data.freq_num
-        data_at_freq_lite = [None] * self.raw_data.freq_num
+        data_at_freq = [None] * self.fnum
         labels = []
         labels_lite = []
-        for ff, freq in enumerate(self.raw_data.freqs):
-            labels.extend([f"{lab} ({int(freq)} Hz)" for lab in ProcessedFile.LABELS])
-            labels_lite.extend([f"{lab} ({int(freq)} Hz)" for lab in ProcessedFileLite.LABELS])
+        for ff, freq in enumerate(self.freq):
+            labels.extend([f"{lab} ({int(freq)} Hz)" for lab in ProcessedPowder.LABELS])
             data_at_freq[ff] = np.stack((
-                time[:, ff],
-                temp[:, ff],
-                tempb[:, ff],
-                caps[:, ff],                                # C'
-                self.raw_data.cap_std[:, ff],
-                self.bare_cap_curve[:, ff],                 # C'_b
-                np.ones(data_pts) * self.bare_cap_dev[ff],
-                del_cap_real[:, ff],                        # del C'          
-                del_cap_err_real[:, ff],
-                loss[:, ff],                                # tan(delta)
-                self.raw_data.loss_std[:, ff],
-                self.bare_loss_curve[:, ff],                # tan(delta)_b
-                np.ones(data_pts) * self.bare_loss_dev[ff],
-                cap_imag[:, ff],                            # C''
-                cap_err_imag[:, ff],
-                cap_bare_imag[:, ff],                       # C''_b
-                cap_err_bare_imag[:, ff],
-                del_cap_imag[:, ff],                        # del C''
-                del_cap_err_imag[:, ff],
-                eps_real[:, ff],                            # real dielectric constant
-                eps_real_std[:, ff],
-                eps_real_err[:, ff],
-                eps_imag[:, ff],                            # imaginary dielectric constant
-                eps_imag_std[:, ff],
-                eps_imag_err[:, ff],
-                volt[:, ff],
+                self.time[:, ff][temperature_mask],
+                self.temp[:, ff][temperature_mask],
+                self.caps[:, ff][temperature_mask],                 # C'
+                self.loss[:, ff][temperature_mask],                 # loss
+                self.real_shift[:, ff][temperature_mask],           # del C'
+                self.std_real[:, ff][temperature_mask],
+                self.imag_shift[:, ff][temperature_mask],           # del C''
+                self.std_imag[:, ff][temperature_mask],
                 np.ones(data_pts) * freq,
             ), axis=1)
-            data_at_freq_lite[ff] = np.stack((
-                time[temperature_mask][:, ff],
-                temp[temperature_mask][:, ff],
-                caps[temperature_mask][:, ff] - self.bare_cap_curve[temperature_mask][:, ff],   # del C'          
-                del_cap_err_real[temperature_mask][:, ff],
-                del_cap_imag[temperature_mask][:, ff],                        # del C''
-                del_cap_err_imag[temperature_mask][:, ff],
-                eps_real[temperature_mask][:, ff],                            # real dielectric constant
-                eps_real_std[temperature_mask][:, ff],
-                eps_imag[temperature_mask][:, ff],                            # imaginary dielectric constant
-                eps_imag_std[temperature_mask][:, ff],
-                volt[temperature_mask][:, ff],
-                np.ones(np.sum(temperature_mask)) * freq,
-            ), axis=1)
         data = np.hstack(data_at_freq)
-        data_lite = np.hstack(data_at_freq_lite)
         labels = ", ".join(labels)
         labels_lite = ", ".join(labels_lite)
-        np.savetxt(self.dir / (self.name + "__calibrated.csv"), data, delimiter = ", ", header=labels)
-        np.savetxt(self.dir / (self.name + "__calibrated_lite.csv"), data_lite, delimiter = ", ", header=labels_lite)
+        np.savetxt(self.dir / (self.name + "__powder-process.csv"), data, delimiter = ", ", header=labels)
 
     def determine_variance_pt2pt(self, slice_size: int):
         if self.bare is not None:
-            real = self.caps - self.bare
+            real = self.real_shift
         else:
             real = self.caps
-        imaginary = self.loss * self.caps
+        imaginary = self.imag_shift
         slices = np.arange(0, len(self.time), slice_size)
         slices[-1] = len(self.time)
 
@@ -180,7 +127,6 @@ class Powder:
             capacitance_shift = real[:, ff]
             imaginary_capacitance = imaginary[:, ff]
             for ss in range(len(slices) - 1):
-                time_slice = time[slices[ss] : slices[ss + 1]]
                 real_slice = capacitance_shift[slices[ss] : slices[ss + 1]]
                 imag_slice = imaginary_capacitance[slices[ss] : slices[ss + 1]]
                 pt2pt_diff_re = real_slice[1:] - real_slice[:1]
@@ -198,10 +144,10 @@ class Powder:
         params_im = params_re.copy()
 
         if self.bare is not None:
-            real = self.caps - self.bare
+            real = self.real_shift
         else:
             real = self.caps
-        imaginary = self.loss * self.caps
+        imaginary = self.imag_shift
         slices = np.arange(0, len(self.time), slice_size)
         if len(self.time) - slices[-1] > poly_order:
             slices = np.append(slices, len(self.time))
@@ -476,5 +422,4 @@ if __name__ == "__main__":
 
     file = Path(r"H:\OneDrive - UCB-O365\Rogerslab3\Teddy\Thesis\chapter-4\Data\BDS\1@TPP sat - GBA 124\Cooling_1468959484_96 - Copy.csv")
     pow = Powder(file, 1.175)
-    plt.show()
     

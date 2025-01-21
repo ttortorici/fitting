@@ -34,6 +34,7 @@ license = { text = "GPL" }
 [project.scripts]
 bare-fit = "fitting.programs:bare_fit"
 calibrate-capacitor = "fitting.programs:calibrate_capacitor"
+process-powder = "fitting.programs:process_powder"
 plot-spectra = "fitting.programs:plot"
 
 [tool.setuptools.packages.find]
