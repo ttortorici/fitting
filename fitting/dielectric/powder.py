@@ -157,19 +157,19 @@ class Powder:
         std_devs_re = np.empty_like(self.time)
         std_devs_im = np.empty_like(self.time)
         for ff in range(self.fnum):
-            time = self.time[:, ff]
+            temp = self.temp[:, ff]
             capacitance_shift = real[:, ff]
             imaginary_capacitance = imaginary[:, ff]
             for ss in range(len(slices) - 1):
-                time_slice = time[slices[ss] : slices[ss + 1]]
+                temp_slice = temp[slices[ss] : slices[ss + 1]]
                 capt_slice = capacitance_shift[slices[ss] : slices[ss + 1]]
                 loss_slice = imaginary_capacitance[slices[ss] : slices[ss + 1]]
                 params_re[0] = np.average(capt_slice)
                 params_im[0] = np.average(loss_slice)
-                fit_capt = least_squares(RawData.residuals, params_re, args=(time_slice, capt_slice), method="lm")
-                fit_loss = least_squares(RawData.residuals, params_im, args=(time_slice, loss_slice), method="lm")
-                curve_slice_c = RawData.poly_fit(fit_capt.x, time_slice)
-                curve_slice_l = RawData.poly_fit(fit_loss.x, time_slice)
+                fit_capt = least_squares(RawData.residuals, params_re, args=(temp_slice, capt_slice), method="lm")
+                fit_loss = least_squares(RawData.residuals, params_im, args=(temp_slice, loss_slice), method="lm")
+                curve_slice_c = RawData.poly_fit(fit_capt.x, temp_slice)
+                curve_slice_l = RawData.poly_fit(fit_loss.x, temp_slice)
                 diff_c = curve_slice_c - capt_slice
                 diff_l = curve_slice_l - loss_slice
 
