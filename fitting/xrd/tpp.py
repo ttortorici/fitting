@@ -1455,18 +1455,27 @@ class GIWAXS(Film):
         weights = {}
         self.sectors = {}
         for key in keys:
-            for file in path_to_data.glob(f"*{key}*.edf"):
+            files = list(path_to_data.glob(f"*{key}*.edf"))
+            data = np.zeros_like(np.loadtxt(files[0]))
+            self.sectors[key] = (200, 200)
+            for file in files:
                 print(file.name)
                 try:
                     print(f"Loading {file.relative_to(Path.cwd()).as_posix()}")
                 except ValueError:
                     print(f"Loading {file.as_posix()}")
-                self.sectors[key] = tuple([int(num) for num in re.search(r'\((.*?)\)', file.name).group(1).split(',')])
-                print(f"With key: {key} which has sector ({self.sectors[key][0]}, {self.sectors[key][1]})")
-                data = np.loadtxt(file)
+                sector_tuple = tuple([int(num) for num in re.search(r'\((.*?)\)', file.name).group(1).split(',')])
+                print(f"With key: {key} which has sector ({sector_tuple[0]}, {sector_tuple[1]})")
+                if self.sectors[key][0] > sector_tuple[0]:
+                    self.sectors[key] = sector_tuple
+                
+                data = data + np.loadtxt(file)
                 q[key] = data[:, 0]
                 counts[key] = data[:, 1]
                 weights[key] = data[:, 2]
+            print(f"Using sector: ({self.sectors[key][0]}, {self.sectors[key][1]})")
+            if len(files) > 1:
+                data = data / len(files)
         super().__init__(a, c, q, counts, False, weights, det_dist, sample_size, wavelength, name, background)
         self.giwaxs = True
         self.hex_params["w0"] = 0.
