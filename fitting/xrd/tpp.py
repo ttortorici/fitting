@@ -1456,6 +1456,8 @@ class GIWAXS(Film):
         self.sectors = {}
         for key in keys:
             files = list(path_to_data.glob(f"*{key}*.edf"))
+            print(key)
+            print(files)
             data = np.zeros_like(np.loadtxt(files[0]))
             self.sectors[key] = (200, 200)
             for file in files:
@@ -1475,7 +1477,7 @@ class GIWAXS(Film):
                 weights[key] = data[:, 2]
             print(f"Using sector: ({self.sectors[key][0]}, {self.sectors[key][1]})")
             if len(files) > 1:
-                data = data / len(files)
+                data = data / float(len(files))
         super().__init__(a, c, q, counts, False, weights, det_dist, sample_size, wavelength, name, background)
         self.giwaxs = True
         self.hex_params["w0"] = 0.
