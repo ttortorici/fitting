@@ -62,24 +62,24 @@ class Powder:
                             + linear_term * temperatures_300 + quadratic_term * temperatures_300 * temperatures_300)
             self.real_shift = self.caps - self.bare
             self.imag_shift = self.caps * self.loss
-        self.std_real, self.std_imag = self.determine_variance(10, 1)
-        print(self.std_real)
-        self.std_real_p2p, self.std_imag_p2p = self.determine_variance_pt2pt(10)
-        print(self.std_real_p2p)
-        print(self.std_real_p2p / self.std_real)
-        self.variance_point_to_point()
-        fig, ax = plt.subplots(2, 1, figsize=(6, 8))
-        for ii in range(3):
-            ax[0].plot(self.temp[:, ii], self.std_real[:, ii], label=f"{self.freq[ii]}")
-            ax[0].plot(self.temp[:, ii], self.std_real_p2p[:, ii], label=f"{self.freq[ii]} p2p")
-            ax[1].plot(self.temp[:, ii], self.std_imag[:, ii], label=f"{self.freq[ii]}")
-            ax[1].plot(self.temp[:, ii], self.std_imag_p2p[:, ii], label=f"{self.freq[ii]} p2p")
-        ax[0].set_title("Real Error")
-        ax[1].set_title("Imaginary Error")
-        for ii in range(2):
-            ax[ii].set_xlabel("Temperature (K)")
-            ax[ii].legend()
-            ax[ii].grid()
+        self.std_real, self.std_imag = self.determine_variance(5, 1)
+        # print(self.std_real)
+        # self.std_real_p2p, self.std_imag_p2p = self.determine_variance_pt2pt(5)
+        # print(self.std_real_p2p)
+        # print(self.std_real_p2p / self.std_real)
+        # self.variance_point_to_point()
+        # fig, ax = plt.subplots(2, 1, figsize=(6, 8))
+        # for ii in range(3):
+        #     ax[0].plot(self.temp[:, ii], self.std_real[:, ii], label=f"{self.freq[ii]}")
+        #     ax[0].plot(self.temp[:, ii], self.std_real_p2p[:, ii], label=f"{self.freq[ii]} p2p")
+        #     ax[1].plot(self.temp[:, ii], self.std_imag[:, ii], label=f"{self.freq[ii]}")
+        #     ax[1].plot(self.temp[:, ii], self.std_imag_p2p[:, ii], label=f"{self.freq[ii]} p2p")
+        # ax[0].set_title("Real Error")
+        # ax[1].set_title("Imaginary Error")
+        # for ii in range(2):
+        #     ax[ii].set_xlabel("Temperature (K)")
+        #     ax[ii].legend()
+        #     ax[ii].grid()
 
     def run(self, max_temperature_data: float=None):
         if max_temperature_data is not None:
