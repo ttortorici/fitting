@@ -29,7 +29,7 @@ def load_ras(filename: Path):
 
 LN2 = np.log(2.)
 INV_ROOT_PI_LN2 = 1. / np.sqrt(LN2 * np.pi)
-FWHM_SQ_TO_HALF_SIGMA_SQ = 1. / 8. * LN2
+FWHM_SQ_TO_HALF_SIGMA_SQ = 1. / (8. * LN2)
 TWO_PI = 2. * np.pi
 
 
