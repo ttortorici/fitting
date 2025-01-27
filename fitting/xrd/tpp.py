@@ -470,12 +470,12 @@ class TPP:
                     fit = self.current_fit(sector)
                     row = int(0.5 * ii)
                     col = ii % 2
-                    axes[row, col].plot(self.q[sector], fit, label="Fit", color="red", lw="0.5")
+                    axes[row, col].plot(self.q[sector], fit, color="red", lw="0.5")
                 return fig, axes
             else:
                 for ii, sector in enumerate(self.keys):
                     fit = self.current_fit(sector)
-                    axes.plot(self.q[sector], fit, label="Fit", color="red", lw="0.5")
+                    axes.plot(self.q[sector], fit, color="red", lw="0.5")
                 return fig, axes
         elif mixture:
             hexagonal, monoclinic = self.current_fit(mixture=mixture)
@@ -486,7 +486,7 @@ class TPP:
         else:
             fit = self.current_fit()
             fig, ax = self.show_data(fig_size=fig_size)
-            ax.plot(self.q, fit, label="Fit", color="red", lw="0.5")
+            ax.plot(self.q, fit, color="red", lw="0.5")
             return fig, ax
     
     def save(self, name, title=None, dpi=600, fig_size=None):
@@ -551,7 +551,13 @@ class TPP:
                 print(f'({h},{k},{l}) at q = {q[ii, 0]:5e} inv A: {self.mono_peak_heights[ii, 0]:.5e}')
 
     def report_fit(self, fit):
-        dof = len(self.counts) - len(fit.x)
+        if self.giwaxs:
+            dof = 0
+            for key in self.keys:
+                dof += len(self.counts[key])
+            dof -= len(fit.x)
+        else:
+            dof = len(self.counts) - len(fit.x)
         reduced_chi_sq = 2 * fit.cost / dof
         if reduced_chi_sq > 1e5:
             print(f"Reduced chi-squared: {reduced_chi_sq:.3e}")
@@ -1472,12 +1478,15 @@ class GIWAXS(Film):
                     self.sectors[key] = sector_tuple
                 
                 data = data + np.loadtxt(file)
-                q[key] = data[:, 0]
-                counts[key] = data[:, 1]
-                weights[key] = data[:, 2]
+                
             print(f"Using sector: ({self.sectors[key][0]}, {self.sectors[key][1]})")
             if len(files) > 1:
+                print("dividing by {}".format(float(len(files))))
                 data = data / float(len(files))
+
+            q[key] = data[:, 0]
+            counts[key] = data[:, 1]
+            weights[key] = data[:, 2]
         super().__init__(a, c, q, counts, False, weights, det_dist, sample_size, wavelength, name, background)
         self.giwaxs = True
         self.hex_params["w0"] = 0.
