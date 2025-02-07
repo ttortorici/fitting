@@ -611,6 +611,7 @@ class TPP:
             else:
                 print("({},{},{}) Hexagonal peak already is not present.".format(h, k, l))
         else:
+            print(type(self.hex_hkl[sector]))
             ind = np.where((self.hex_hkl[sector][:, 0] == h) & (self.hex_hkl[sector][:, 1] == k) & (self.hex_hkl[sector][:, 2] == l))[0]
             if len(ind) == 1:
                 self.hex_hkl[sector] = np.delete(self.hex_hkl[sector], ind, axis=0)

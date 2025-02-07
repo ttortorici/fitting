@@ -92,9 +92,10 @@ class Bare:
         ci = params[temperature.shape[1] - 1:]
         rt = 300.
         temp_rt = temperature - rt
-        poly = np.array(c0, dtype=np.float64)
+        poly = 1
         for ii in range(1, len(ci)):
-            poly = poly + ci[ii] * temp_rt ** ii
+            poly += ci[ii] * temp_rt ** ii
+        poly = poly * np.array(c0, dtype=np.float64)
         return poly
 
     @classmethod
@@ -151,7 +152,7 @@ class Bare:
             for ii, f in enumerate(self.freq):
                 print(f" - C{subscript[0]} = {self._fit_real[ii]:.6f} pF @ {int(f)} Hz")
             for ii in range(len(self._fit_real) - self.fnum):
-                print(f" - C{subscript[ii + 1]} = {self._fit_real[self.fnum + ii]:.6e} pF-K\u207B{superscript[ii + 1]}")
+                print(f" - C{subscript[ii + 1]} = {self._fit_real[self.fnum + ii]:.6e} K\u207B{superscript[ii + 1]}")
         if self._fit_imag is None:
             print("Losses have not been fitted.")
         else:

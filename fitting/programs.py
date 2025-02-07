@@ -2,6 +2,7 @@ from fitting.dielectric.bare import Bare
 from fitting.dielectric.load import RawData, ProcessedFile, ProcessedFileLite
 from fitting.dielectric.calibrate import Calibrate
 from fitting.dielectric.powder import Powder
+import numpy as np
 from pathlib import Path
 from datetime import datetime
 import matplotlib.pylab as plt
@@ -102,9 +103,10 @@ def process_powder():
         epilog="author: Teddy Tortorici <edward.tortorici@colorado.edu"
     )
     parser.add_argument("powder_file", help="The CSV file containing powder capacitance measurement data.")
-    parser.add_argument("-B", "--bare", type=float, help="Measured bare capacitance at room temperature")
-    parser.add_argument("-L", "--linear", type=float, default=2.3e-5, help="Linear dependence of the capacitance")
-    parser.add_argument("-Q", "--quadratic", type=float, default=3e-8, help="Quadratic dependence of the capacitance")
+    parser.add_argument("-B", "--bare", help="Measured bare capacitance at room temperature")
+    parser.add_argument("-1", "--linear", type=float, default=2.795173e-05, help="Linear dependence of the capacitance")
+    parser.add_argument("-2", "--quadratic", type=float, default=1.141850e-07, help="Quadratic dependence of the capacitance")
+    parser.add_argument("-3", "--quartic", type=float, default=2.817504e-10, help="Quartic dependence of the capacitance")
     parser.add_argument("-MD", "--max_temperature_data", type=float, help="Cut off temperatures in Lite file (in K)")
     parser.add_argument("-S", "--sorted", action="store_true", help="Use this flag if the data is already sorted (unique columns for each frequency).")
     args = parser.parse_args()
@@ -117,6 +119,9 @@ def process_powder():
         toml.dump(args_dict, toml_file)
 
     powder_files = [Path(f).resolve() for f in args.powder_file.split(",")]
+
+    if args.bare is not None:
+        args.bare = np.array(args.bare.split(","), dtype=np.float64)
 
     pow = Powder(powder_files, args.bare, args.linear, args.quadratic, args.sorted)
     pow.run(max_temperature_data=args.max_temperature_data)
