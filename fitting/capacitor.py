@@ -76,9 +76,16 @@ def bare(gap: float, unit_cell: float=20, silica_constant: float=3.9, finger_len
     return EPS0 * geometry_thick_film(gap, 500, unit_cell, finger_length, finger_num) * (1 + silica_constant)
 
 def dielectric_constant(delta_cap_real: float, delta_cap_imag: float, gap: float, film_thickness: float,
-                        finger_length:float = 1e-3, finger_num: int=50,
-                        delta_cap_real_err: float=0., delta_cap_imag_err: float=0., gap_err: float=0.,
-                        film_thickness_err: float=0., finger_length_err: float=0.):
+                        finger_length:float = 1e-3, finger_num: int=50):
+    inv_Cx = (LOG_PI_CORR + gap / film_thickness) / (EPS0 * (finger_num - 1) * finger_length)
+    eps_real = delta_cap_real * inv_Cx + 1
+    eps_imag = delta_cap_imag * inv_Cx
+    return eps_real, eps_imag
+
+def dielectric_constant2(delta_cap_real: float, delta_cap_imag: float, gap: float, film_thickness: float,
+                         finger_length:float = 1e-3, finger_num: int=50,
+                         delta_cap_real_err: float=0., delta_cap_imag_err: float=0., gap_err: float=0.,
+                         film_thickness_err: float=0., finger_length_err: float=0.):
     inv_Cx = (LOG_PI_CORR + gap / film_thickness) / (EPS0 * (finger_num - 1) * finger_length)
     eps_real = delta_cap_real * inv_Cx + 1
     eps_imag = delta_cap_imag * inv_Cx

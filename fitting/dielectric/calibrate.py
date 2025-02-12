@@ -1,5 +1,6 @@
 from fitting.dielectric.bare import Bare
 from fitting.dielectric.data import RawData, ProcessedFile, ProcessedFileLite
+from fitting.dielectric.variance import calculate as determine_variance
 import fitting.capacitor as capacitor
 from pathlib import Path
 import numpy as np
@@ -20,13 +21,16 @@ class Calibrate:
         self.bare_loss_std = None       # will be a 1D array of length frequency_num
         self.raw_data = RawData(film_data_file)
 
-    def load_calibration(self, file: Path, real_poly_order: int, imaginary_poly_order: int, peaks: bool, max_temperature_fit: float):
+    def load_calibration(self, file: Path, real_poly_order: int, imaginary_poly_order: int,
+                         peaks: bool, max_temperature_fit: float):
         bare = Bare(file, max_temperature_fit)
         bare.fit(real_order=real_poly_order, imag_order=imaginary_poly_order, peaks=peaks)
-        bare.show_fit(peaks=peaks)
+        # bare.show_fit(peaks=peaks)
         temperature = self.raw_data.get_temperatures()
         self.bare_cap_curve = bare.fit_function_real(bare._fit_real, temperature)
         if peaks:
+            print(bare._fit_imag)
+            print(len(bare._fit_imag))
             self.bare_loss_curve = bare.fit_function_imag_peaks(bare._fit_imag, temperature)
         else:
             self.bare_loss_curve = bare.fit_function_imag_poly(bare._fit_imag, temperature)
@@ -47,27 +51,24 @@ class Calibrate:
         time = self.raw_data.get_times()
         temp = self.raw_data.get_temperatures()
         tempb = self.raw_data.get_shield_temperatures()
-        caps = self.raw_data.get_capacitances()
+        cap_real = self.raw_data.get_capacitances()
 
         loss = self.raw_data.get_losses()
         volt = self.raw_data.get_voltages()
-        cap_imag = caps * loss
+        cap_imag = cap_real * loss
         cap_bare_imag = self.bare_cap_curve * self.bare_loss_curve
-        cap_err_imag = np.sqrt((self.raw_data.cap_std * loss)**2 + (self.raw_data.loss_std * caps)**2)
-        cap_err_bare_imag = np.sqrt((self.bare_cap_dev * self.bare_loss_curve)**2 + (self.bare_loss_dev * self.bare_cap_curve)**2)
-        del_cap_err_real = np.sqrt(self.raw_data.cap_std * self.raw_data.cap_std + self.bare_cap_dev * self.bare_cap_dev)
-        del_cap_err_imag = np.sqrt(cap_err_imag * cap_err_imag + cap_err_bare_imag * cap_err_bare_imag)
+        cap_real_dev, cap_imag_dev = determine_variance(temp, cap_real, cap_imag) 
         
-        del_cap_real = (caps - self.bare_cap_curve)     # pF
-        del_cap_imag = (cap_imag - cap_bare_imag)       # pF
+        del_cap_real = cap_real - self.bare_cap_curve   # pF
+        del_cap_imag = cap_imag - cap_bare_imag         # pF
+        del_cap_real_dev, del_cap_imag_dev = determine_variance(temp, del_cap_real, del_cap_imag)
 
-        (eps_real, eps_imag), (eps_real_err, eps_imag_err) = capacitor.dielectric_constant(
-            del_cap_real, del_cap_imag, gap_width, film_thickness, finger_length=1e-3,
-            finger_num=finger_num, delta_cap_real_err=del_cap_err_real, delta_cap_imag_err=del_cap_err_imag,
-            gap_err=gap_err, film_thickness_err=film_thickness_err, finger_length_err=finger_length_err
+        eps_real, eps_imag = capacitor.dielectric_constant(
+            del_cap_real, del_cap_imag, gap_width, film_thickness,
+            finger_length=1e-3, finger_num=finger_num
         )
 
-        eps_real_std, eps_imag_std = self.raw_data.determine_variance(15, 1, eps_real, eps_imag)
+        eps_real_dev, eps_imag_dev = determine_variance(temp, eps_real, eps_imag)
 
         data_at_freq = [None] * self.raw_data.freq_num
         data_at_freq_lite = [None] * self.raw_data.freq_num
@@ -80,42 +81,35 @@ class Calibrate:
                 time[:, ff],
                 temp[:, ff],
                 tempb[:, ff],
-                caps[:, ff],                                # C'
-                self.raw_data.cap_std[:, ff],
+                cap_real[:, ff],                            # C'
+                cap_real_dev[:, ff],
                 self.bare_cap_curve[:, ff],                 # C'_b
-                np.ones(data_pts) * self.bare_cap_dev[ff],
                 del_cap_real[:, ff],                        # del C'          
-                del_cap_err_real[:, ff],
+                del_cap_real_dev[:, ff],
                 loss[:, ff],                                # tan(delta)
-                self.raw_data.loss_std[:, ff],
                 self.bare_loss_curve[:, ff],                # tan(delta)_b
-                np.ones(data_pts) * self.bare_loss_dev[ff],
                 cap_imag[:, ff],                            # C''
-                cap_err_imag[:, ff],
-                cap_bare_imag[:, ff],                       # C''_b
-                cap_err_bare_imag[:, ff],
+                cap_imag_dev[:, ff],
                 del_cap_imag[:, ff],                        # del C''
-                del_cap_err_imag[:, ff],
+                del_cap_imag_dev[:, ff],
                 eps_real[:, ff],                            # real dielectric constant
-                eps_real_std[:, ff],
-                eps_real_err[:, ff],
+                eps_real_dev[:, ff],
                 eps_imag[:, ff],                            # imaginary dielectric constant
-                eps_imag_std[:, ff],
-                eps_imag_err[:, ff],
+                eps_imag_dev[:, ff],
                 volt[:, ff],
                 np.ones(data_pts) * freq,
             ), axis=1)
             data_at_freq_lite[ff] = np.stack((
                 time[temperature_mask][:, ff],
                 temp[temperature_mask][:, ff],
-                caps[temperature_mask][:, ff] - self.bare_cap_curve[temperature_mask][:, ff],   # del C'          
-                del_cap_err_real[temperature_mask][:, ff],
+                cap_real[temperature_mask][:, ff] - self.bare_cap_curve[temperature_mask][:, ff],   # del C'          
+                del_cap_real_dev[temperature_mask][:, ff],
                 del_cap_imag[temperature_mask][:, ff],                        # del C''
-                del_cap_err_imag[temperature_mask][:, ff],
+                del_cap_imag_dev[temperature_mask][:, ff],
                 eps_real[temperature_mask][:, ff],                            # real dielectric constant
-                eps_real_std[temperature_mask][:, ff],
+                eps_real_dev[temperature_mask][:, ff],
                 eps_imag[temperature_mask][:, ff],                            # imaginary dielectric constant
-                eps_imag_std[temperature_mask][:, ff],
+                eps_imag_dev[temperature_mask][:, ff],
                 volt[temperature_mask][:, ff],
                 np.ones(np.sum(temperature_mask)) * freq,
             ), axis=1)

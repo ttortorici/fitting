@@ -66,9 +66,9 @@ def calibrate_capacitor():
     parser.add_argument("film_thickness", type=float, help="Thickness of film in nanometers.")
     parser.add_argument("gap_width", type=float, help="gap width in microns.")
     parser.add_argument("-N", "--finger_num", type=int, default=50, help="Number of fingers on the capacitor.")
-    parser.add_argument("-TE", "--thickness_error", type=float, default=0., help="Estimated film thickness error in nanometers.")
-    parser.add_argument("-GE", "--gap_error", type=float, default=0., help="Estimated error of the gap width in microns.")
-    parser.add_argument("-FE", "--finger_length_error", type=float, default=0., help="Experimental error of the finger length in microns (should be roughly half the over-etching).")
+    # parser.add_argument("-TE", "--thickness_error", type=float, default=0., help="Estimated film thickness error in nanometers.")
+    # parser.add_argument("-GE", "--gap_error", type=float, default=0., help="Estimated error of the gap width in microns.")
+    # parser.add_argument("-FE", "--finger_length_error", type=float, default=0., help="Experimental error of the finger length in microns (should be roughly half the over-etching).")
     parser.add_argument("-MF", "--max_temperature_fit", type=float, help="Cut off temperatures above this value (in K).")
     parser.add_argument("-MD", "--max_temperature_data", type=float, help="Cut off temperatures in Lite file (in K)")
     parser.add_argument("-F", "--no_peaks", action="store_true", help="Don't fit peaks in the loss")
@@ -85,7 +85,8 @@ def calibrate_capacitor():
     film_files = [Path(f).resolve() for f in args.film_file.split(",")]
 
     cal = Calibrate(film_files)
-    cal.load_calibration(bare_files, args.real_order, args.imaginary_order, peaks=not args.no_peaks,
+    cal.load_calibration(bare_files, args.real_order, args.imaginary_order,
+                         peaks=not args.no_peaks,
                          max_temperature_fit=args.max_temperature_fit)
     cal.run(args.film_thickness * 1e-9,
             args.gap_width * 1e-6,

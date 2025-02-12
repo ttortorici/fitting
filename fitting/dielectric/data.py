@@ -4,44 +4,6 @@ from scipy.optimize import least_squares
 import matplotlib.pylab as plt
 plt.style.use("fitting.style")
 
-def estimate_coef_linear(x, y):
-    pts = len(x)
-    x_mean = np.
-
-def determine_variance(x, y, slice_size=10, poly_order=1):
-    
-    params_c = [0] * (poly_order + 1)
-    params_l = params_c.copy()
-    slices = np.arange(0, len(times), slice_size)
-    if len(times) - slices[-1] > poly_order:
-        slices = np.append(slices, len(times))
-    else:
-        slices[-1] = len(times)
-    
-    std_devs_c = np.empty_like(times)
-    std_devs_l = np.empty_like(times)
-    for ff, freq in enumerate(self.freqs):
-        time = times[:, ff]
-        capacitance = real[:, ff]
-        losstangent = imaginary[:, ff]
-        for ss in range(len(slices) - 1):
-            time_slice = time[slices[ss] : slices[ss + 1]]
-            capt_slice = capacitance[slices[ss] : slices[ss + 1]]
-            loss_slice = losstangent[slices[ss] : slices[ss + 1]]
-            params_c[0] = np.average(capt_slice)
-            params_l[0] = np.average(loss_slice)
-            fit_capt = least_squares(self.residuals, params_c, args=(time_slice, capt_slice), method="lm")
-            fit_loss = least_squares(self.residuals, params_l, args=(time_slice, loss_slice), method="lm")
-            curve_slice_c = self.poly_fit(fit_capt.x, time_slice)
-            curve_slice_l = self.poly_fit(fit_loss.x, time_slice)
-            diff_c = curve_slice_c - capt_slice
-            diff_l = curve_slice_l - loss_slice
-            variance_c = np.sum(diff_c * diff_c) / (len(capt_slice) - 1)
-            variance_l = np.sum(diff_l * diff_l) / (len(loss_slice) - 1)
-            std_devs_c[slices[ss]: slices[ss + 1], ff] = np.sqrt(variance_c)
-            std_devs_l[slices[ss]: slices[ss + 1], ff] = np.sqrt(variance_l)
-    return std_devs_c, std_devs_l
-
 
 class File:
     @staticmethod
@@ -120,49 +82,49 @@ class RawFile(File):
         derivative = self.calc_time_derivatives()
         is_close = np.logical_not(np.all(np.isclose(derivative, 0, atol=1e-3, rtol=2e-3), axis=1))
         self.data = self.data[is_close]
-        self.cap_std = self.cap_std[is_close]
-        self.loss_std = self.loss_std[is_close]
+        if self.cap_std is not None:
+            self.cap_std = self.cap_std[is_close]
+            self.loss_std = self.loss_std[is_close]
         print(f"now is shape: {self.data.shape}")
         self.shape = self.data.shape
 
-    def determine_variance(self, slice_size: int, poly_order: int, real=None, imaginary=None):
-        params_c = [0] * (poly_order + 1)
-        params_l = params_c.copy()
-        times = self.get_times()
-        if real is None:
-            real = self.get_capacitances()
-        if imaginary is None:
-            imaginary = self.get_losses()
-        slices = np.arange(0, len(times), slice_size)
-        if len(times) - slices[-1] > poly_order:
-            slices = np.append(slices, len(times))
-        else:
-            slices[-1] = len(times)
-        
-        std_devs_c = np.empty_like(times)
-        std_devs_l = np.empty_like(times)
-        for ff, freq in enumerate(self.freqs):
-            time = times[:, ff]
-            capacitance = real[:, ff]
-            losstangent = imaginary[:, ff]
-            for ss in range(len(slices) - 1):
-                time_slice = time[slices[ss] : slices[ss + 1]]
-                capt_slice = capacitance[slices[ss] : slices[ss + 1]]
-                loss_slice = losstangent[slices[ss] : slices[ss + 1]]
-                params_c[0] = np.average(capt_slice)
-                params_l[0] = np.average(loss_slice)
-                fit_capt = least_squares(self.residuals, params_c, args=(time_slice, capt_slice), method="lm")
-                fit_loss = least_squares(self.residuals, params_l, args=(time_slice, loss_slice), method="lm")
-                curve_slice_c = self.poly_fit(fit_capt.x, time_slice)
-                curve_slice_l = self.poly_fit(fit_loss.x, time_slice)
-                diff_c = curve_slice_c - capt_slice
-                diff_l = curve_slice_l - loss_slice
-
-                variance_c = np.sum(diff_c * diff_c) / (len(capt_slice) - 1)
-                variance_l = np.sum(diff_l * diff_l) / (len(loss_slice) - 1)
-                std_devs_c[slices[ss]: slices[ss + 1], ff] = np.sqrt(variance_c)
-                std_devs_l[slices[ss]: slices[ss + 1], ff] = np.sqrt(variance_l)
-        return std_devs_c, std_devs_l
+    # def determine_variance(self, slice_size: int, poly_order: int, real=None, imaginary=None):
+    #     params_c = [0] * (poly_order + 1)
+    #     params_l = params_c.copy()
+    #     times = self.get_times()
+    #     if real is None:
+    #         real = self.get_capacitances()
+    #     if imaginary is None:
+    #         imaginary = self.get_losses()
+    #     slices = np.arange(0, len(times), slice_size)
+    #     if len(times) - slices[-1] > poly_order:
+    #         slices = np.append(slices, len(times))
+    #     else:
+    #         slices[-1] = len(times)
+    #     
+    #     std_devs_c = np.empty_like(times)
+    #     std_devs_l = np.empty_like(times)
+    #     for ff, freq in enumerate(self.freqs):
+    #         time = times[:, ff]
+    #         capacitance = real[:, ff]
+    #         losstangent = imaginary[:, ff]
+    #         for ss in range(len(slices) - 1):
+    #             time_slice = time[slices[ss] : slices[ss + 1]]
+    #             capt_slice = capacitance[slices[ss] : slices[ss + 1]]
+    #             loss_slice = losstangent[slices[ss] : slices[ss + 1]]
+    #             params_c[0] = np.average(capt_slice)
+    #             params_l[0] = np.average(loss_slice)
+    #             fit_capt = least_squares(self.residuals, params_c, args=(time_slice, capt_slice), method="lm")
+    #             fit_loss = least_squares(self.residuals, params_l, args=(time_slice, loss_slice), method="lm")
+    #             curve_slice_c = self.poly_fit(fit_capt.x, time_slice)
+    #             curve_slice_l = self.poly_fit(fit_loss.x, time_slice)
+    #             diff_c = curve_slice_c - capt_slice
+    #             diff_l = curve_slice_l - loss_slice
+    #             variance_c = np.sum(diff_c * diff_c) / (len(capt_slice) - 1)
+    #             variance_l = np.sum(diff_l * diff_l) / (len(loss_slice) - 1)
+    #             std_devs_c[slices[ss]: slices[ss + 1], ff] = np.sqrt(variance_c)
+    #             std_devs_l[slices[ss]: slices[ss + 1], ff] = np.sqrt(variance_l)
+    #     return std_devs_c, std_devs_l
     
     def get_inds(self, col_ind):
         return [col_ind + self.COLS_PER * ii for ii in range(self.freq_num)]
@@ -270,15 +232,14 @@ class RawFile(File):
 class ProcessedFile(RawFile):
     LABELS = ["Time [s]", "Temperature A [K]", "Temperature B [K]",
               "Capacitance [pF]", "Cap STD [pF]",
-              "Bare Cap Curves [pF]", "Bare Cap STD [pF]",
+              "Bare Cap Curves [pF]",
               "Delta C' [pF]", "Delta C' STD [pF]",
-              "Loss Tangent", "Loss Tangent STD",
-              "Bare Loss", "Bare Loss STD",
+              "Loss Tangent",
+              "Bare Loss",
               "C'' [pF]", "C'' STD [PF]",
-              "Bare C'' [pF]", "Bare C'' STD [pF]",
               "Delta C'' [pF]", "Delta C'' STD [pF]",
-              "Real Dielectric Constant", "Real Dielectric Constant STD", "Real Dielectric Constant Error",
-              "Imaginary Dielectric Constant", "Imaginary Dielectric Constant STD", "Imaginary Dielectric Constant Error",
+              "Real Dielectric Constant", "Real Dielectric Constant STD",
+              "Imaginary Dielectric Constant", "Imaginary Dielectric Constant STD",
               "Voltage [V]", "Frequency [Hz]"]
 
     TIME_IND = 0
@@ -287,28 +248,21 @@ class ProcessedFile(RawFile):
     CAP_IND = 3         # measured capacitance
     CAPERR_IND = 4
     BAREC_IND = 5       # fitted bare capacitance
-    BARECERR_IND = 6
-    DELCRE_IND = 7      # delta C'
-    DELCREERR_IND = 8
-    LOSS_IND = 9        # measured loss
-    LOSSERR_IND = 10
-    BAREL_IND = 11      # fitted bare loss
-    BARELERR_IND = 12
-    CAPIM_IND = 13      # C''
-    CAPIMERR_IND = 14
-    BARECIM_IND = 15    # bare C''
-    BARECIMERR_IND = 16
-    DELCIM_IND = 17     # delta C''
-    DELCIMERR_IND = 18
-    EPSRE_IND = 19      # electric susceptibility (real part)
-    EPSRESTD_IND = 20
-    EPSREERR_IND = 21
-    EPSIM_IND = 22      # electric susceptibility (imaginary part)
-    EPSIMSTD_IND = 23
-    EPSIMERR_IND = 24
-    VOLT_IND = 25
-    FREQ_IND = 26
-    COLS_PER = 27
+    DELCRE_IND = 6      # delta C'
+    DELCREERR_IND = 7
+    LOSS_IND = 8        # measured loss
+    BAREL_IND = 9       # fitted bare loss
+    CAPIM_IND = 10      # C''
+    CAPIMERR_IND = 11
+    DELCIM_IND = 12     # delta C''
+    DELCIMERR_IND = 13
+    EPSRE_IND = 14      # electric susceptibility (real part)
+    EPSRESTD_IND = 15
+    EPSIM_IND = 16      # electric susceptibility (imaginary part)
+    EPSIMSTD_IND = 17
+    VOLT_IND = 18
+    FREQ_IND = 19
+    COLS_PER = 20
 
     def get_capacitance_errors(self):
         inds = self.get_inds(self.CAPERR_IND)
@@ -526,7 +480,7 @@ class RawData(RawFile):
     def __init__(self, files):
         super().__init__(files)
         # self.determine_ascending()
-        self.cap_std, self.loss_std = self.determine_variance(10, 1)
+        # self.cap_std, self.loss_std = self.determine_variance(10, 1)
         self.time_derivative_filter()
 
 class ProcessedPowder(RawFile):
