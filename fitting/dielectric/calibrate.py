@@ -39,8 +39,8 @@ class Calibrate:
         self.bare_cap_dev = bare.standard_dev_real
         self.bare_loss_dev = bare.standard_dev_imag
 
-    def run(self, film_thickness: float, gap_width: float, finger_num: int=50, gap_err: float=0,
-            film_thickness_err: float=0, finger_length_err: float=0, max_temperature_data: float=None):
+    def run(self, film_thickness: float, gap_width: float, finger_num: int=50,
+            max_temperature_data: float=None):
         if max_temperature_data is not None:
             temperature_mask = np.all(self.raw_data.get_temperatures() < max_temperature_data, axis=1)
         else:

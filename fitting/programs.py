@@ -91,9 +91,9 @@ def calibrate_capacitor():
     cal.run(args.film_thickness * 1e-9,
             args.gap_width * 1e-6,
             finger_num=args.finger_num,
-            gap_err=args.gap_error * 1e-6,
-            film_thickness_err=args.thickness_error * 1e-9,
-            finger_length_err=args.finger_length_error * 1e-6,
+            # gap_err=args.gap_error * 1e-6,
+            # film_thickness_err=args.thickness_error * 1e-9,
+            # finger_length_err=args.finger_length_error * 1e-6,
             max_temperature_data=args.max_temperature_data)
     
 
