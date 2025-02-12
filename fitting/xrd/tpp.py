@@ -404,7 +404,7 @@ class TPP:
                 num_sectors = len(self.q.keys())
                 if fig_size is None:
                     fig_size = (10, 2 * num_sectors)
-                fig, axes = plt.subplots(2, round(0.5 * num_sectors))
+                fig, axes = plt.subplots(2, round(0.5 * num_sectors), figsize=fig_size)
                 for ii, sector in enumerate(self.q.keys()):
                     row = int(0.5 * ii)
                     col = ii % 2

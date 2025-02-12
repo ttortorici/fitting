@@ -1,7 +1,7 @@
 from scipy.optimize import least_squares
 from scipy.special import erf
 from pathlib import Path
-from fitting.dielectric.load import RawData, Unsorted, ProcessedPowder
+from fitting.dielectric.data import RawData, Unsorted, ProcessedPowder
 import numpy as np
 import matplotlib.pylab as plt
 plt.style.use("fitting.style")

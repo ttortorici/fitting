@@ -4,6 +4,45 @@ from scipy.optimize import least_squares
 import matplotlib.pylab as plt
 plt.style.use("fitting.style")
 
+def estimate_coef_linear(x, y):
+    pts = len(x)
+    x_mean = np.
+
+def determine_variance(x, y, slice_size=10, poly_order=1):
+    
+    params_c = [0] * (poly_order + 1)
+    params_l = params_c.copy()
+    slices = np.arange(0, len(times), slice_size)
+    if len(times) - slices[-1] > poly_order:
+        slices = np.append(slices, len(times))
+    else:
+        slices[-1] = len(times)
+    
+    std_devs_c = np.empty_like(times)
+    std_devs_l = np.empty_like(times)
+    for ff, freq in enumerate(self.freqs):
+        time = times[:, ff]
+        capacitance = real[:, ff]
+        losstangent = imaginary[:, ff]
+        for ss in range(len(slices) - 1):
+            time_slice = time[slices[ss] : slices[ss + 1]]
+            capt_slice = capacitance[slices[ss] : slices[ss + 1]]
+            loss_slice = losstangent[slices[ss] : slices[ss + 1]]
+            params_c[0] = np.average(capt_slice)
+            params_l[0] = np.average(loss_slice)
+            fit_capt = least_squares(self.residuals, params_c, args=(time_slice, capt_slice), method="lm")
+            fit_loss = least_squares(self.residuals, params_l, args=(time_slice, loss_slice), method="lm")
+            curve_slice_c = self.poly_fit(fit_capt.x, time_slice)
+            curve_slice_l = self.poly_fit(fit_loss.x, time_slice)
+            diff_c = curve_slice_c - capt_slice
+            diff_l = curve_slice_l - loss_slice
+            variance_c = np.sum(diff_c * diff_c) / (len(capt_slice) - 1)
+            variance_l = np.sum(diff_l * diff_l) / (len(loss_slice) - 1)
+            std_devs_c[slices[ss]: slices[ss + 1], ff] = np.sqrt(variance_c)
+            std_devs_l[slices[ss]: slices[ss + 1], ff] = np.sqrt(variance_l)
+    return std_devs_c, std_devs_l
+
+
 class File:
     @staticmethod
     def loadtxt(filename: str) -> np.ndarray:

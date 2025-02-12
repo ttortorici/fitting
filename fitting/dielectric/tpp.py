@@ -2,7 +2,7 @@ import numpy as np
 from itertools import product
 from pathlib import Path
 from scipy.optimize import least_squares
-from fitting.dielectric.load import ProcessedFileLite
+from fitting.dielectric.data import ProcessedFileLite
 import matplotlib.pylab as plt
 
 class Debye:

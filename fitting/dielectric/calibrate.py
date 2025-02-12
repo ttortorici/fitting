@@ -1,5 +1,5 @@
 from fitting.dielectric.bare import Bare
-from fitting.dielectric.load import RawData, ProcessedFile, ProcessedFileLite
+from fitting.dielectric.data import RawData, ProcessedFile, ProcessedFileLite
 import fitting.capacitor as capacitor
 from pathlib import Path
 import numpy as np

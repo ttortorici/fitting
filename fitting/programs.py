@@ -1,5 +1,5 @@
 from fitting.dielectric.bare import Bare
-from fitting.dielectric.load import RawData, ProcessedFile, ProcessedFileLite
+from fitting.dielectric.data import RawData, ProcessedFile, ProcessedFileLite
 from fitting.dielectric.calibrate import Calibrate
 from fitting.dielectric.powder import Powder
 import numpy as np
