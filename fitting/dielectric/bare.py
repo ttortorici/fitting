@@ -104,7 +104,6 @@ class Bare:
 
     @staticmethod
     def fit_function_imag_peaks(params, temperature):
-        # center = params[2]
         l0 = np.array([params[:temperature.shape[1]]])
 
         li = params[temperature.shape[1] * 3 - 1:]
@@ -112,7 +111,6 @@ class Bare:
         height = np.array(params[temperature.shape[1]:2*temperature.shape[1]])
         width = np.array(params[2*temperature.shape[1]:3*temperature.shape[1]])
         #center = params[3*temperature.shape[1]:4*temperature.shape[1]]
-
         t0 = 120.
         temp_t0 = temperature - t0
         poly = np.array(l0, dtype=np.float64)

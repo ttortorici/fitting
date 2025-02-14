@@ -20,17 +20,16 @@ class Calibrate:
         self.bare_cap_std = None        # will be a 1D array of length frequency_num
         self.bare_loss_std = None       # will be a 1D array of length frequency_num
         self.raw_data = RawData(film_data_file)
+        print()
 
     def load_calibration(self, file: Path, real_poly_order: int, imaginary_poly_order: int,
                          peaks: bool, max_temperature_fit: float):
         bare = Bare(file, max_temperature_fit)
         bare.fit(real_order=real_poly_order, imag_order=imaginary_poly_order, peaks=peaks)
-        # bare.show_fit(peaks=peaks)
+        
         temperature = self.raw_data.get_temperatures()
         self.bare_cap_curve = bare.fit_function_real(bare._fit_real, temperature)
         if peaks:
-            print(bare._fit_imag)
-            print(len(bare._fit_imag))
             self.bare_loss_curve = bare.fit_function_imag_peaks(bare._fit_imag, temperature)
         else:
             self.bare_loss_curve = bare.fit_function_imag_poly(bare._fit_imag, temperature)
