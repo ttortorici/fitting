@@ -2,6 +2,7 @@ from scipy.optimize import least_squares
 from scipy.special import erf
 from pathlib import Path
 from fitting.dielectric.data import RawData, Unsorted, ProcessedPowder
+from fitting.dielectric.variance import calculate as calc_variance
 import numpy as np
 import matplotlib.pylab as plt
 plt.style.use("fitting.style")
@@ -17,10 +18,11 @@ superscript = ["\u2070", "\u00B9", "\u00B2", "\u00B3", "\u2074",
 
 class Powder:
     def __init__(self, data_files: list[Path],
-                 room_temperature_capacitance: float = None,
-                 linear_term: float = 2.795173e-05,
-                 quadratic_term: float = 1.141850e-07, 
-                 quartic_term: float = 2.817504e-10, already_sorted=False):
+                 room_temperature_capacitance: float,
+                 linear_term: float,
+                 quadratic_term: float, 
+                 quartic_term: float,
+                 epsilon_substrate: float, already_sorted=False):
         print("Loading Powder data. Loading data from file(s):")
         self.sorted = already_sorted
         if isinstance(data_files, str):
@@ -55,6 +57,7 @@ class Powder:
         self.standard_dev_imag = None
         self.ascending = None
         self.data = None
+        self.inv_eps0_G0 = (1 + epsilon_substrate) / room_temperature_capacitance
 
         self.load_file(data_files)
 
@@ -70,7 +73,13 @@ class Powder:
                             + quartic_term * temp_300_sq * temperatures_300)
             self.real_shift = self.caps - self.bare
             self.imag_shift = self.caps * self.loss
-        self.std_real, self.std_imag = self.determine_variance(5, 1)
+            self.std_shift_real, self.std_shift_imag = calc_variance(self.real_shift, self.imag_shift, 5)
+
+            self.eps_real = 1 + self.real_shift * self.inv_eps0_G0
+            self.eps_imag = self.imag_shift * self.inv_eps0_G0
+            self.std_eps_real, self.std_eps_imag = calc_variance(self.eps_real, self.eps_imag, 5)
+
+        # self.std_real, self.std_imag = self.determine_variance(5, 1)
 
     def run(self, max_temperature_data: float=None):
         if max_temperature_data is not None:
@@ -92,9 +101,13 @@ class Powder:
                 self.caps[:, ff][temperature_mask],                 # C'
                 self.loss[:, ff][temperature_mask],                 # loss
                 self.real_shift[:, ff][temperature_mask],           # del C'
-                self.std_real[:, ff][temperature_mask],
+                self.std_shift_real[:, ff][temperature_mask],
                 self.imag_shift[:, ff][temperature_mask],           # del C''
-                self.std_imag[:, ff][temperature_mask],
+                self.std_shift_imag[:, ff][temperature_mask],
+                self.eps_real[:, ff][temperature_mask],             # eps' effective
+                self.std_eps_real[:, ff][temperature_mask],
+                self.eps_imag[:, ff][temperature_mask],             # eps'' effective
+                self.std_eps_imag[:, ff][temperature_mask],
                 np.ones(data_pts) * freq,
             ), axis=1)
         data = np.hstack(data_at_freq)

@@ -57,7 +57,7 @@ def calibrate_capacitor():
     parser = argparse.ArgumentParser(
         prog="calibrate-capacitor",
         description="Process a calibrated data set with real and imaginary dielectric constant",
-        epilog="author: Teddy Tortorici <edward.tortorici@colorado.edu"
+        epilog="author: Teddy Tortorici <edward.tortorici@colorado.edu>"
     )
     parser.add_argument("bare_file", help="The CSV file containing bare capacitance data.")
     parser.add_argument("film_file", help="The CSV file containing film capacitance measurement data.")
@@ -101,14 +101,15 @@ def process_powder():
     parser = argparse.ArgumentParser(
         prog="process-powder",
         description="Process powder data",
-        epilog="author: Teddy Tortorici <edward.tortorici@colorado.edu"
+        epilog="author: Teddy Tortorici <edward.tortorici@colorado.edu>"
     )
     parser.add_argument("powder_file", help="The CSV file containing powder capacitance measurement data.")
-    parser.add_argument("-B", "--bare", help="Measured bare capacitance at room temperature")
-    parser.add_argument("-1", "--linear", type=float, default=2.795173e-05, help="Linear dependence of the capacitance")
-    parser.add_argument("-2", "--quadratic", type=float, default=1.141850e-07, help="Quadratic dependence of the capacitance")
-    parser.add_argument("-3", "--quartic", type=float, default=2.817504e-10, help="Quartic dependence of the capacitance")
-    parser.add_argument("-MD", "--max_temperature_data", type=float, help="Cut off temperatures in Lite file (in K)")
+    parser.add_argument("-B", "--bare", help="Measured bare capacitance at room temperature.")
+    parser.add_argument("-1", "--linear", type=float, default=2.795173e-05, help="Linear dependence of the capacitance.")
+    parser.add_argument("-2", "--quadratic", type=float, default=1.141850e-07, help="Quadratic dependence of the capacitance.")
+    parser.add_argument("-3", "--quartic", type=float, default=2.817504e-10, help="Quartic dependence of the capacitance.")
+    parser.add_argument("-epss", "--substrate-epsilon", type=float, default=3.8, help="Dielectric constant of the silicon substrate.")
+    parser.add_argument("-MD", "--max_temperature_data", type=float, help="Cut off temperatures in Lite file (in K).")
     parser.add_argument("-S", "--sorted", action="store_true", help="Use this flag if the data is already sorted (unique columns for each frequency).")
     args = parser.parse_args()
 
@@ -132,7 +133,7 @@ def plot():
     parser = argparse.ArgumentParser(
         prog="plot-spectra",
         description="Plot dielectric spectroscopy data.",
-        epilog="author: Teddy Tortorici <edward.tortorici@colorado.edu"
+        epilog="author: Teddy Tortorici <edward.tortorici@colorado.edu>"
     )
     parser.add_argument("file_name", help="File, or comma-separated files, to load and plot.")
     parser.add_argument("-RL", "--real_limits", help="ylim for real part.")
