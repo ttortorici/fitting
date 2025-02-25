@@ -23,11 +23,12 @@ def bare_fit():
     parser.add_argument("imaginary_order", type=int, help="The polynomial order for fitting the loss tangent data")
     parser.add_argument("-M", "--max_temperature", type=float, default=None, help="Optionally cut out temperatures above this value (in K).")
     parser.add_argument("-F", "--no_peaks", action="store_true", help="Don't fit peaks in the loss")
+    parser.add_argument("-C", "--peak_center", type=float, default=None, help="Lock peak center to a specific temperature")
     args = parser.parse_args()
 
     files = [Path(f).resolve() for f in args.file.split(",")]
 
-    bare = Bare(files, args.max_temperature)
+    bare = Bare(files, args.max_temperature, args.peak_center)
     bare.fit(real_order=args.real_order, imag_order=args.imaginary_order, peaks=not args.no_peaks)
     
     keys_real = [f"order 0 @ {int(f)} Hz" for f in bare.freq] + [f"order {ii}" for ii in range(1, args.real_order + 1)]
