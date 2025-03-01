@@ -14,6 +14,8 @@ class LoadFit:
         self.spacing_err = np.empty(3, dtype=np.float64)
         self.amplitudes = np.empty((11, 3), dtype=np.float64)
         self.amplitudes_err = np.empty((11, 3), dtype=np.float64)
+        self.asymmetry = np.empty(3, dtype=np.float64)
+        self.asymmetry_err = np.empty(3, dtype=np.float64)
         start = False
         with open(file, "r") as f:
             for line in f.readlines():
@@ -28,7 +30,7 @@ class LoadFit:
     def parse_line(self, line):
         list_line = line.split('\t')
         param = list_line[1].strip("*")
-        if param[0] in ["e", "g", "a"]:
+        if param[0] in ["e", "g", "a", "s"]:
             value = float(list_line[2])
             error = float(list_line[3])
         else:
@@ -41,6 +43,9 @@ class LoadFit:
             elif param[0] == "g":
                 self.spacing[peak_index] = value
                 self.spacing_err[peak_index] = error
+            elif param[0] == "s":
+                self.asymmetry[peak_index] = value
+                self.asymmetry_err[peak_index] = error
         elif "amp" in param:
             peak_index = int(param[3]) - 1
             if param[4] == "c":
@@ -70,7 +75,7 @@ class LoadFit:
         return (y - cls.gaussian2(x, y, spacing, *params)) / weight
 
 
-    def hist(self):
+    def hist(self, plot_curves=True):
         for ii in range(len(self.center)):
             print(f"PEAK {ii+1}")
             print(f" - total area : {np.sum(self.amplitudes[:, ii] * self.spacing[ii])}")
@@ -91,13 +96,16 @@ class LoadFit:
                 print(f" - curve1 area : {np.sqrt(2 * np.pi) * popt1[1] * popt1[0]}")
                 print(f" - curve1 center: {popt1[-1]}")
                 print(f" - curve1 sigma : {popt1[1]}")
-                ax.plot(x, self.gaussian(x, *popt1), "orange")
+                if plot_curves:
+                    ax.plot(x, self.gaussian(x, *popt1), "orange")
             if fit2 is not None:
                 print(f" - curve2 center: {fit2.x[1]}")
                 print(f" - curve2 sigma : {fit2.x[0]}")
-                ax.plot(x, self.gaussian2(x, self.amplitudes[:, ii], self.spacing[ii], *fit2.x), "r")
+                if plot_curves:
+                    ax.plot(x, self.gaussian2(x, self.amplitudes[:, ii], self.spacing[ii], *fit2.x), "r")
             ax.set_xlabel("activation energy")
             ax.set_ylabel("amplitudes")
+            ax.grid()
             fig.tight_layout()
             # fig.savefig(f"peak-{ii+1}-amplitudes.png", dpi=100, bbox_inches="tight")
 
