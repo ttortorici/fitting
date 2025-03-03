@@ -16,6 +16,9 @@ class LoadFit:
         self.amplitudes_err = np.empty((11, 3), dtype=np.float64)
         self.asymmetry = np.empty(3, dtype=np.float64)
         self.asymmetry_err = np.empty(3, dtype=np.float64)
+        self.attempt = np.empty(3, dtype=np.float64)
+        self.attempt_err = np.empty(3, dtype=np.float64)
+        self.cb300 = None
         start = False
         with open(file, "r") as f:
             for line in f.readlines():
@@ -30,12 +33,12 @@ class LoadFit:
     def parse_line(self, line):
         list_line = line.split('\t')
         param = list_line[1].strip("*")
-        if param[0] in ["e", "g", "a", "s"]:
+        if param[0] in ["e", "g", "a", "s", "t", "c"]:
             value = float(list_line[2])
             error = float(list_line[3])
         else:
             return
-        if len(param) == 2:
+        if len(param) == 2 and param[1] in ["1", "2", "3"]:
             peak_index = int(param[1]) - 1
             if param[0] == "e":
                 self.center[peak_index] = value
@@ -46,6 +49,9 @@ class LoadFit:
             elif param[0] == "s":
                 self.asymmetry[peak_index] = value
                 self.asymmetry_err[peak_index] = error
+            elif param[0] == "t":
+                self.attempt[peak_index] = value
+                self.attempt_err[peak_index] = error
         elif "amp" in param:
             peak_index = int(param[3]) - 1
             if param[4] == "c":
@@ -57,6 +63,8 @@ class LoadFit:
                     dist_num += 1
                 self.amplitudes[dist_num, peak_index] = value
                 self.amplitudes_err[dist_num, peak_index] = error
+        elif "ce300" in param:
+            self.cb300 = value
         self.amplitudes_err[np.where(self.amplitudes_err == 0)] = 1
 
     @staticmethod
