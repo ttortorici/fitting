@@ -38,7 +38,7 @@ class LoadFit:
             error = float(list_line[3])
         else:
             return
-        if len(param) == 2 and param[1] in ["1", "2", "3"]:
+        if len(param) == 2 and param[1] in ["1", "2", "3", "0"]:
             peak_index = int(param[1]) - 1
             if param[0] == "e":
                 self.center[peak_index] = value
@@ -50,8 +50,12 @@ class LoadFit:
                 self.asymmetry[peak_index] = value
                 self.asymmetry_err[peak_index] = error
             elif param[0] == "t":
-                self.attempt[peak_index] = value
-                self.attempt_err[peak_index] = error
+                if peak_index:
+                    self.attempt[peak_index] = value
+                    self.attempt_err[peak_index] = error
+                else:
+                    self.attempt = value
+                    self.attempt_err = error
         elif "amp" in param:
             peak_index = int(param[3]) - 1
             if param[4] == "c":
