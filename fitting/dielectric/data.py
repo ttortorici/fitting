@@ -153,7 +153,7 @@ class RawFile(File):
         inds = self.get_inds(self.VOLT_IND)
         return self.data[:, inds]
     
-    def plot(self, figsize=None, vertical=True, real_imaginary=False):
+    def plot(self, figsize=None, vertical=True, real_imaginary=False, legend=True):
         colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
         temperature = self.get_temperatures()
         capacitance = self.get_capacitances()
@@ -224,7 +224,8 @@ class RawFile(File):
                 )
         ax_re.grid()
         ax_im.grid()
-        ax_im.legend()
+        if legend:
+            ax_im.legend()
         fig.tight_layout()
         return fig, (ax_re, ax_im)
 
@@ -368,8 +369,15 @@ class ProcessedFile(RawFile):
         inds = self.get_inds(self.EPSIMSTD_IND)
         return self.data[:, inds]
     
-    def plot(self, figsize=None, vertical=True, plot_sus=False):
-        if self.freq_num == 3:
+    def plot(self, figsize=None, vertical=True, plot_sus=False, legend=1, freq_mask=None):
+        if freq_mask is None:
+            freq_mask = list(np.arange(self.freq_num, dtype=int))
+            freqs = self.freqs
+            freq_num = self.freq_num
+        else:
+            freqs = [self.freqs[f] for f in freq_mask]
+            freq_num = len(freqs)
+        if freq_num == 3:
             colors = ("k", "b", "r")
         else:
             colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
@@ -396,41 +404,38 @@ class ProcessedFile(RawFile):
             ax_re.set_ylabel("$\\Delta C'$ (pF)")
             ax_im.set_ylabel("$\\Delta C''$ (pF)")
         
-        for ff, freq in enumerate(self.freqs):
+        for ii, (ff, freq) in enumerate(zip(freq_mask, freqs)):
             freq_str = str(int(freq))
             if len(freq_str) > 4:
                 freq_str = f"{freq_str[:-3]} kHz"
             else:
                 freq_str += " Hz"
             ax_re.scatter(
-                temperature[:, ff],
-                real[:, ff],
-                s=5,
-                facecolor="w",
-                edgecolor=colors[ff % len(colors)],
-                lw=.75,
-                label=freq_str,
+                temperature[:, ff], real[:, ff],
+                s=5, facecolor="w", lw=.75,
+                edgecolor=colors[ii % len(colors)],
             )
-        ax_im.set_xlabel("Temperature (K)")
-        
-        for ff, freq in enumerate(self.freqs):
-            freq_str = str(int(freq))
-            if len(freq_str) > 4:
-                freq_str = f"{freq_str[:-3]} kHz"
-            else:
-                freq_str += " Hz"
             ax_im.scatter(
-                temperature[:, ff],
-                imag[:, ff],
-                s=5,
-                facecolor="w",
-                edgecolor=colors[ff % len(colors)],
-                lw=.75,
-                label=freq_str,
+                temperature[:, ff], imag[:, ff],
+                s=5, facecolor="w", lw=.75,
+                edgecolor=colors[ii % len(colors)],
             )
+            if legend is not None:
+                if legend:
+                    ax_im.plot(np.nan, np.nan, colors[ii % len(colors)], label=freq_str)
+                    ax_im.legend()
+                else:
+                    ax_re.plot(np.nan, np.nan, colors[ii % len(colors)], label=freq_str)
+                    ax_re.legend()
+            # ax_re.scatter(np.nan, np.nan, s=40, facecolor="w", lw=3,
+            #               edgecolor=colors[ff % len(colors)], label=freq_str)
+            #ax_im.scatter(np.nan, np.nan, s=40, facecolor="w", lw=2,
+            #              edgecolor=colors[ff % len(colors)], label=freq_str)
+
+        ax_im.set_xlabel("Temperature (K)")
+            
         ax_re.grid()
         ax_im.grid()
-        ax_im.legend()
         fig.tight_layout()
         return fig, (ax_re, ax_im)
     
@@ -470,8 +475,16 @@ class ProcessedFileLite(ProcessedFile):
     BARECIM_IND = None
     BARECIMERR_IND = None
 
-    def plot(self, figsize=None, vertical=True, plot_sus=True):
-        fig, axes = super().plot(figsize, vertical, plot_sus)
+    def plot(self, figsize=None, vertical=True, plot_sus=True, legend_ax_ind=1, freq_mask=None):
+        fig, axes = super().plot(figsize, vertical, plot_sus, legend_ax_ind, freq_mask)
+        return fig, axes
+    
+    def plot_paper(self, figsize=(6.5, 3.5), vertical=False, plot_sus=True, legend_ax_ind=1, freq_mask=None):
+        fig, axes = self.plot(figsize, vertical, plot_sus, legend_ax_ind, freq_mask)
+        return fig, axes
+    
+    def plot_ppt(self, figsize=(5.4, 2.6), vertical=False, plot_sus=True, legend_ax_ind=None, freq_mask=None):
+        fig, axes = self.plot(figsize, vertical, plot_sus, legend_ax_ind, freq_mask)
         return fig, axes
 
 

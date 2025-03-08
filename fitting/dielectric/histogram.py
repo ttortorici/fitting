@@ -1,24 +1,50 @@
 import numpy as np
 from pathlib import Path
 from scipy.optimize import curve_fit, least_squares
+from scipy.integrate import quad
 import matplotlib.pylab as plt
 plt.style.use('fitting.style')
 
 
+def average_prefactor(hwhm):
+    def lorenzian(theta, hwhm):
+        arg = (theta - 0.5 * np.pi) / hwhm
+        return 1. / (np.pi * hwhm * (1 + arg * arg))
+
+    def integrand_numer(theta, hwhm):
+        return np.sin(theta) ** 3 * lorenzian(theta, hwhm)
+
+    def integrand_denom(theta, hwhm):
+        return np.sin(theta) * lorenzian(theta, hwhm)
+    
+    return quad(integrand_numer, 0, np.pi, args=(hwhm))[0] / quad(integrand_denom, 0, np.pi, args=(hwhm))[0]
+
 class LoadFit:
 
-    def __init__(self, file: Path):
+    amp_conv = 1760
+    np_sq_conv = 91
+
+    def __init__(self, file: Path, polar: bool = True, powder: bool = False, fwhm: float = None):
+        if powder:
+            self.pre_factor = 2. / 3.
+        else:
+            if fwhm is None:
+                self.pre_factor = 1.
+            else:
+                average_prefactor(0.5 * fwhm)
+        self.polar = polar
         self.center = np.empty(3, dtype=np.float64)
         self.center_err = np.empty(3, dtype=np.float64)
         self.spacing = np.empty(3, dtype=np.float64)
         self.spacing_err = np.empty(3, dtype=np.float64)
         self.amplitudes = np.empty((11, 3), dtype=np.float64)
+        self.total_amplitude = np.empty(3, dtype=np.float64)
         self.amplitudes_err = np.empty((11, 3), dtype=np.float64)
+        self.total_amplitude_err = np.empty(3, dtype=np.float64)
         self.asymmetry = np.empty(3, dtype=np.float64)
         self.asymmetry_err = np.empty(3, dtype=np.float64)
         self.attempt = np.empty(3, dtype=np.float64)
         self.attempt_err = np.empty(3, dtype=np.float64)
-        self.cb300 = None
         start = False
         with open(file, "r") as f:
             for line in f.readlines():
@@ -38,7 +64,7 @@ class LoadFit:
             error = float(list_line[3])
         else:
             return
-        if len(param) == 2 and param[1] in ["1", "2", "3", "0"]:
+        if len(param) == 2 and param[1] in ["1", "2", "3"]:
             peak_index = int(param[1]) - 1
             if param[0] == "e":
                 self.center[peak_index] = value
@@ -50,12 +76,8 @@ class LoadFit:
                 self.asymmetry[peak_index] = value
                 self.asymmetry_err[peak_index] = error
             elif param[0] == "t":
-                if peak_index:
-                    self.attempt[peak_index] = value
-                    self.attempt_err[peak_index] = error
-                else:
-                    self.attempt = value
-                    self.attempt_err = error
+                self.attempt[peak_index] = value
+                self.attempt_err[peak_index] = error
         elif "amp" in param:
             peak_index = int(param[3]) - 1
             if param[4] == "c":
@@ -67,9 +89,21 @@ class LoadFit:
                     dist_num += 1
                 self.amplitudes[dist_num, peak_index] = value
                 self.amplitudes_err[dist_num, peak_index] = error
-        elif "ce300" in param:
-            self.cb300 = value
         self.amplitudes_err[np.where(self.amplitudes_err == 0)] = 1
+        self.total_amplitude = np.sum(self.amplitudes, axis=0)
+        self.total_amplitude_err = np.sqrt(np.sum(self.amplitudes_err * self.amplitudes_err))
+    
+    def np_sq(self):
+        return self.total_amplitude / self.np_sq_conv
+    
+    def np_sq_err(self):
+        return self.total_amplitude_err / self.np_sq_conv
+    
+    def dipole_density(self):
+        return self.total_amplitude / self.amp_conv
+    
+    def dipole_density_err(self):
+        return self.total_amplitude_err / self.amp_conv
 
     @staticmethod
     def gaussian(x, amp, sigma, x0):
@@ -120,6 +154,18 @@ class LoadFit:
             ax.grid()
             fig.tight_layout()
             # fig.savefig(f"peak-{ii+1}-amplitudes.png", dpi=100, bbox_inches="tight")
+    
+    def __str__(self):
+        if self.polar:
+            to_print = "  | ln(tau) | energy | spacing | asymmetry | dipole density |\n"
+        else:
+            to_print = "  | ln(tau) | energy | spacing | asymmetry |       np\u00B2      |\n"
+        for ii in range(3):
+            if self.polar:
+                to_print += f"{ii+1} | {self.attempt[ii]:>7.3f} | {self.center[ii]:>6.1f} | {self.spacing[ii]:>7.0f} | {self.asymmetry[ii]:>9.3f} | {self.dipole_density()[ii]:>14.10f} |\n"
+            else:
+                to_print += f"{ii+1} | {self.attempt[ii]:>7.3f} | {self.center[ii]:>6.1f} | {self.spacing[ii]:>7.0f} | {self.asymmetry[ii]:>9.3f} | {self.np_sq()[ii]:>14.10f} |\n"
+        return to_print
 
 
 if __name__ == "__main__":
