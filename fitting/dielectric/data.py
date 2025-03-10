@@ -154,7 +154,10 @@ class RawFile(File):
         return self.data[:, inds]
     
     def plot(self, figsize=None, vertical=True, real_imaginary=False, legend=True):
-        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        if self.freq_num == 3:
+            colors = ['k', 'b', 'r']
+        else:
+            colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
         temperature = self.get_temperatures()
         capacitance = self.get_capacitances()
         losstangent = self.get_losses()
@@ -496,7 +499,7 @@ class RawData(RawFile):
         # self.cap_std, self.loss_std = self.determine_variance(10, 1)
         self.time_derivative_filter()
 
-class ProcessedPowder(RawFile):
+class ProcessedPowder(ProcessedFile):
     LABELS = ["Time [s]", "Temperature A [K]",
               "Capacitance [pF]",
               "Loss Tangent",
@@ -508,32 +511,39 @@ class ProcessedPowder(RawFile):
 
     TIME_IND = 0
     TEMPA_IND = 1
-    TEMPB_IND = 2
-    CAP_IND = 3         # measured capacitance
-    CAPERR_IND = 4
-    BAREC_IND = 5       # fitted bare capacitance
-    BARECERR_IND = 6
-    DELCRE_IND = 7      # delta C'
-    DELCREERR_IND = 8
-    LOSS_IND = 9        # measured loss
-    LOSSERR_IND = 10
-    BAREL_IND = 11      # fitted bare loss
-    BARELERR_IND = 12
-    CAPIM_IND = 13      # C''
-    CAPIMERR_IND = 14
-    BARECIM_IND = 15    # bare C''
-    BARECIMERR_IND = 16
-    DELCIM_IND = 17     # delta C''
-    DELCIMERR_IND = 18
-    EPSRE_IND = 19      # electric susceptibility (real part)
-    EPSRESTD_IND = 20
-    EPSREERR_IND = 21
-    EPSIM_IND = 22      # electric susceptibility (imaginary part)
-    EPSIMSTD_IND = 23
-    EPSIMERR_IND = 24
-    VOLT_IND = 25
-    FREQ_IND = 26
-    COLS_PER = 27
+    CAP_IND = 2         # measured capacitance
+    LOSS_IND = 3        # measured loss
+    DELCRE_IND = 4      # delta C'
+    DELCREERR_IND = 5
+    EPSRE_IND = 6       # effective dielectric constant (real part)
+    EPSRESTD_IND = 7
+    EPSREERR_IND = 7
+    CAPIM_IND = 8       # C''
+    CAPIMERR_IND = 9
+    EPSIM_IND = 10      # effective dielectric constant (imaginary part)
+    EPSIMSTD_IND = 11
+    EPSIMERR_IND = 11
+    FREQ_IND = 12
+    COLS_PER = 13
+
+    def plot(self, figsize=None, vertical=True, legend=1):
+        fig, (ax_re, ax_im) = super().plot(figsize=figsize, vertical=vertical, legend=legend, plot_sus=True)
+        ax_re.set_ylabel("$\\varepsilon_\\mathregular{{eff}}'$")
+        ax_im.set_ylabel("$\\varepsilon_\\mathregular{{eff}}''$")
+        
+        return fig, (ax_re, ax_im)
+    
+    def shift(self, amount):
+        inds = self.get_inds(self.EPSRE_IND)
+        self.data[:, inds] = self.data[:, inds] + amount
+
+    def converge(self):
+        minimums = self.get_real_susceptibilities().min(axis=0)
+        central_min = minimums[1]
+        shifter = central_min - minimums
+        # print("shifted real parth with", shifter)
+        self.shift(shifter)
+        return shifter
 
 
 class Unsorted(File):

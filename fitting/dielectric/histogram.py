@@ -6,23 +6,23 @@ import matplotlib.pylab as plt
 plt.style.use('fitting.style')
 
 
-def average_prefactor(hwhm):
-    def lorenzian(theta, hwhm):
+def average_prefactor(hwhm, offset):
+    def lorenzian(theta):
         arg = (theta - 0.5 * np.pi) / hwhm
-        return 1. / (np.pi * hwhm * (1 + arg * arg))
+        return 1. / (np.pi * hwhm * (1 + arg * arg)) + offset
 
-    def integrand_numer(theta, hwhm):
-        return np.sin(theta) ** 3 * lorenzian(theta, hwhm)
+    def integrand_numer(theta):
+        return np.sin(theta) ** 3 * lorenzian(theta, hwhm, offset)
 
-    def integrand_denom(theta, hwhm):
-        return np.sin(theta) * lorenzian(theta, hwhm)
+    def integrand_denom(theta, hwhm, offset):
+        return np.sin(theta) * lorenzian(theta, hwhm, offset)
     
-    return quad(integrand_numer, 0, np.pi, args=(hwhm))[0] / quad(integrand_denom, 0, np.pi, args=(hwhm))[0]
+    return quad(integrand_numer, 0, np.pi)[0] / quad(integrand_denom, 0, np.pi, args=(hwhm, offset))[0]
 
-class LoadFit:
+class Histogram:
 
-    amp_conv = 1760
-    np_sq_conv = 91
+    amp_conv = 1621 # 4.22 D
+    np_sq_conv = 91.0178518 # nm^3/D^2
 
     def __init__(self, file: Path, polar: bool = True, powder: bool = False, fwhm: float = None):
         if powder:
@@ -32,6 +32,8 @@ class LoadFit:
                 self.pre_factor = 1.
             else:
                 average_prefactor(0.5 * fwhm)
+        self.amp_conv = self.pre_factor * self.amp_conv
+        self.np_sq_conv = self.pre_factor * self.np_sq_conv
         self.polar = polar
         self.center = np.empty(3, dtype=np.float64)
         self.center_err = np.empty(3, dtype=np.float64)
@@ -64,7 +66,7 @@ class LoadFit:
             error = float(list_line[3])
         else:
             return
-        if len(param) == 2 and param[1] in ["1", "2", "3"]:
+        if len(param) == 2 and param[1] in ["1", "2", "3", "0"]:
             peak_index = int(param[1]) - 1
             if param[0] == "e":
                 self.center[peak_index] = value
@@ -76,8 +78,12 @@ class LoadFit:
                 self.asymmetry[peak_index] = value
                 self.asymmetry_err[peak_index] = error
             elif param[0] == "t":
-                self.attempt[peak_index] = value
-                self.attempt_err[peak_index] = error
+                if peak_index > -1:
+                    self.attempt[peak_index] = value
+                    self.attempt_err[peak_index] = error
+                else:
+                    self.attempt = value
+                    self.attemp_err = error
         elif "amp" in param:
             peak_index = int(param[3]) - 1
             if param[4] == "c":
@@ -168,7 +174,7 @@ class LoadFit:
         return to_print
 
 
-if __name__ == "__main__":
+if __name__ == "__main__": 
     file = Path(r"C:\Users\Teddy\OneDrive - UCB-O365\Rogerslab3\Teddy\Thesis\chapter-4\Data\BDS\1@TPP sat - GBA 124\origin-fit_results.txt")
     fit = LoadFit(file)
     fit.hist()
