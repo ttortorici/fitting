@@ -4,11 +4,15 @@ from scipy.optimize import least_squares
 import matplotlib.pylab as plt
 plt.style.use("fitting.style")
 
+def convert_to_nan(val):
+    return np.nan if val == '' else float(val)
+
 
 class File:
     @staticmethod
     def loadtxt(filename: str) -> np.ndarray:
-        return np.loadtxt(filename, comments="#", delimiter=",", skiprows=3, dtype=np.float64)
+        return np.loadtxt(filename, comments="#", delimiter=",", skiprows=3,
+                          dtype=np.float64, converters={0: convert_to_nan, 1: convert_to_nan})
     
     @staticmethod
     def poly_fit(params: list, temperature: np.ndarray) -> np.ndarray:
