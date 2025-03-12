@@ -64,7 +64,6 @@ class Powder:
         if room_temperature_capacitance is None:
             self.bare = None
         else:
-            
             temperatures_300 = self.temp - 300.
             temp_300_sq = temperatures_300 * temperatures_300
             self.bare = np.ones_like(temperatures_300) * room_temperature_capacitance * (1
@@ -73,11 +72,11 @@ class Powder:
                             + quartic_term * temp_300_sq * temperatures_300)
             self.real_shift = self.caps - self.bare
             self.imag_shift = self.caps * self.loss
-            self.std_shift_real, self.std_shift_imag = calc_variance(self.real_shift, self.imag_shift, 5)
+            self.std_shift_real, self.std_shift_imag = calc_variance(self.temp, self.real_shift, self.imag_shift, 5)
 
             self.eps_real = 1 + self.real_shift * self.inv_eps0_G0
             self.eps_imag = self.imag_shift * self.inv_eps0_G0
-            self.std_eps_real, self.std_eps_imag = calc_variance(self.eps_real, self.eps_imag, 5)
+            self.std_eps_real, self.std_eps_imag = calc_variance(self.temp, self.eps_real, self.eps_imag, 5)
 
         # self.std_real, self.std_imag = self.determine_variance(5, 1)
 

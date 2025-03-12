@@ -1,5 +1,5 @@
 from fitting.dielectric.bare import Bare
-from fitting.dielectric.data import RawData, ProcessedFile, ProcessedFileLite
+from fitting.dielectric.data import RawData, ProcessedFile, ProcessedFileLite, ProcessedPowder
 from fitting.dielectric.calibrate import Calibrate
 from fitting.dielectric.powder import Powder
 import numpy as np
@@ -109,7 +109,7 @@ def process_powder():
     parser.add_argument("-1", "--linear", type=float, default=2.795173e-05, help="Linear dependence of the capacitance.")
     parser.add_argument("-2", "--quadratic", type=float, default=1.141850e-07, help="Quadratic dependence of the capacitance.")
     parser.add_argument("-3", "--quartic", type=float, default=2.817504e-10, help="Quartic dependence of the capacitance.")
-    parser.add_argument("-epss", "--substrate-epsilon", type=float, default=3.8, help="Dielectric constant of the silicon substrate.")
+    parser.add_argument("-epss", "--substrate_epsilon", type=float, default=3.8, help="Dielectric constant of the silicon substrate.")
     parser.add_argument("-MD", "--max_temperature_data", type=float, help="Cut off temperatures in Lite file (in K).")
     parser.add_argument("-S", "--sorted", action="store_true", help="Use this flag if the data is already sorted (unique columns for each frequency).")
     args = parser.parse_args()
@@ -126,7 +126,13 @@ def process_powder():
     if args.bare is not None:
         args.bare = np.array(args.bare.split(","), dtype=np.float64)
 
-    pow = Powder(powder_files, args.bare, args.linear, args.quadratic, args.sorted)
+    pow = Powder(data_files=powder_files,
+                 room_temperature_capacitance=args.bare,
+                 linear_term=args.linear,
+                 quadratic_term=args.quadratic,
+                 quartic_term=args.quartic,
+                 epsilon_substrate=args.substrate_epsilon,
+                 already_sorted=args.sorted)
     pow.run(max_temperature_data=args.max_temperature_data)
 
 
@@ -150,6 +156,8 @@ def plot():
         data = ProcessedFileLite(files)
     elif files[0].stem.endswith("calibration"):
         data = ProcessedFile(files)
+    elif files[0].stem.endswith("powder-process"):
+        data = ProcessedPowder(files)
     else:
         data = RawData(files)
     

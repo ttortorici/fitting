@@ -21,6 +21,7 @@ def calculate(x, real, imag, slice_size=8):
         slices[-1] = len(x)
     std_devs_real = np.empty_like(x)
     std_devs_imag = np.empty_like(x)
+    print(imag.shape)
     for ss in range(len(slices) - 1):
         x_slice = x[slices[ss] : slices[ss + 1], :]
         re_slice = real[slices[ss] : slices[ss + 1], :]
