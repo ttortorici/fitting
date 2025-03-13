@@ -12,12 +12,12 @@ def average_prefactor(hwhm, offset):
         return 1. / (np.pi * hwhm * (1 + arg * arg)) + offset
 
     def integrand_numer(theta):
-        return np.sin(theta) ** 3 * lorenzian(theta, hwhm, offset)
+        return np.sin(theta) ** 3 * lorenzian(theta)
 
-    def integrand_denom(theta, hwhm, offset):
-        return np.sin(theta) * lorenzian(theta, hwhm, offset)
+    def integrand_denom(theta):
+        return np.sin(theta) * lorenzian(theta)
     
-    return quad(integrand_numer, 0, np.pi)[0] / quad(integrand_denom, 0, np.pi, args=(hwhm, offset))[0]
+    return quad(integrand_numer, 0, np.pi)[0] / quad(integrand_denom, 0, np.pi)[0]
 
 class Histogram:
 
@@ -31,7 +31,7 @@ class Histogram:
             if fwhm is None:
                 self.pre_factor = 1.
             else:
-                average_prefactor(0.5 * fwhm)
+                self.pre_factor = average_prefactor(0.5 * fwhm, 0)
         self.amp_conv = self.pre_factor * self.amp_conv
         self.np_sq_conv = self.pre_factor * self.np_sq_conv
         self.polar = polar
