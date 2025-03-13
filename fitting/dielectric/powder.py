@@ -101,10 +101,10 @@ class Powder:
                 self.loss[:, ff][temperature_mask],                 # loss
                 self.real_shift[:, ff][temperature_mask],           # del C'
                 self.std_shift_real[:, ff][temperature_mask],
-                self.imag_shift[:, ff][temperature_mask],           # del C''
-                self.std_shift_imag[:, ff][temperature_mask],
                 self.eps_real[:, ff][temperature_mask],             # eps' effective
                 self.std_eps_real[:, ff][temperature_mask],
+                self.imag_shift[:, ff][temperature_mask],           # del C''
+                self.std_shift_imag[:, ff][temperature_mask],
                 self.eps_imag[:, ff][temperature_mask],             # eps'' effective
                 self.std_eps_imag[:, ff][temperature_mask],
                 np.ones(data_pts) * freq,

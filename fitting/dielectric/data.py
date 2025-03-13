@@ -508,8 +508,8 @@ class ProcessedPowder(ProcessedFile):
               "Capacitance [pF]",
               "Loss Tangent",
               "Delta C' [pF]", "Delta C' STD [pF]",
-              "C'' [pF]", "C'' STD [pF]",
               "Effective eps'", "Effective eps' STD",
+              "C'' [pF]", "C'' STD [pF]",
               "Effective eps''", "Effective eps'' STD",
               "Frequency [Hz]"]
 
