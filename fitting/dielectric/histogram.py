@@ -58,6 +58,18 @@ class Histogram:
                 if '\t\tValue\t' in line:
                     start = True
 
+    def report(self):
+        total_amplitude = np.sum(self.amplitudes)
+        total_amplitude_err = np.sqrt(np.sum(self.amplitudes_err * self.amplitudes_err))
+        if self.polar:
+            n = total_amplitude / self.amp_conv
+            n_err = total_amplitude_err / self.amp_conv
+            print(f"n  = ({n} +/- {n_err}) dipoles/nm^3")
+        else:
+            np_sq = total_amplitude / self.np_sq_conv
+            np_sq_err = total_amplitude_err / self.np_sq_conv
+            print(f"np^2  = ({np_sq} +/- {np_sq_err}) dipoles/nm^3")
+
     def parse_line(self, line):
         list_line = line.split('\t')
         param = list_line[1].strip("*")
