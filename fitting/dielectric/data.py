@@ -446,6 +446,14 @@ class ProcessedFile(RawFile):
         fig.tight_layout()
         return fig, (ax_re, ax_im)
     
+    def plot_paper(self, figsize=(6.5, 3.5), vertical=False, plot_sus=True, legend_ax_ind=1, freq_mask=None):
+        fig, axes = self.plot(figsize, vertical, plot_sus, legend_ax_ind, freq_mask)
+        return fig, axes
+    
+    def plot_ppt(self, figsize=(5.4, 2.6), vertical=False, plot_sus=True, legend_ax_ind=None, freq_mask=None):
+        fig, axes = self.plot(figsize, vertical, plot_sus, legend_ax_ind, freq_mask)
+        return fig, axes
+    
 
 class ProcessedFileLite(ProcessedFile):
     LABELS = ["Time [s]", "Temperature A [K]",
@@ -512,7 +520,53 @@ class ProcessedPowder(ProcessedFile):
               "C'' [pF]", "C'' STD [pF]",
               "Effective eps''", "Effective eps'' STD",
               "Frequency [Hz]"]
+    TIME_IND = 0
+    TEMPA_IND = 1
+    CAP_IND = 2         # measured capacitance
+    LOSS_IND = 3        # measured loss
+    DELCRE_IND = 4      # delta C'
+    DELCREERR_IND = 5
+    CAPIM_IND = 6       # C''
+    CAPIMERR_IND = 7
+    EPSRE_IND = 8       # effective dielectric constant (real part)
+    EPSRESTD_IND = 9
+    EPSREERR_IND = 9
+    EPSIM_IND = 10      # effective dielectric constant (imaginary part)
+    EPSIMSTD_IND = 11
+    EPSIMERR_IND = 11
+    FREQ_IND = 12
+    COLS_PER = 13
 
+    def plot(self, figsize=None, vertical=True, plot_sus=True, legend_ax_ind=1, freq_mask=None):
+        fig, (ax_re, ax_im) = super().plot(figsize=figsize, vertical=vertical, plot_sus=plot_sus,
+                                           legend=legend_ax_ind, freq_mask=freq_mask)
+        ax_re.set_ylabel("$\\varepsilon_\\mathregular{{eff}}'$")
+        ax_im.set_ylabel("$\\varepsilon_\\mathregular{{eff}}''$")
+        
+        return fig, (ax_re, ax_im)
+    
+    def shift(self, amount):
+        inds = self.get_inds(self.EPSRE_IND)
+        self.data[:, inds] = self.data[:, inds] + amount
+
+    def converge(self):
+        minimums = self.get_real_susceptibilities().min(axis=0)
+        central_min = minimums[1]
+        shifter = central_min - minimums
+        # print("shifted real parth with", shifter)
+        self.shift(shifter)
+        return shifter
+
+
+class ProcessedPowder2(ProcessedPowder):
+    LABELS = ["Time [s]", "Temperature A [K]",
+              "Capacitance [pF]",
+              "Loss Tangent",
+              "Delta C' [pF]", "Delta C' STD [pF]",
+              "C'' [pF]", "C'' STD [pF]",
+              "Effective eps'", "Effective eps' STD",
+              "Effective eps''", "Effective eps'' STD",
+              "Frequency [Hz]"]
     TIME_IND = 0
     TEMPA_IND = 1
     CAP_IND = 2         # measured capacitance
@@ -531,23 +585,8 @@ class ProcessedPowder(ProcessedFile):
     COLS_PER = 13
 
     def plot(self, figsize=None, vertical=True, legend=1):
-        fig, (ax_re, ax_im) = super().plot(figsize=figsize, vertical=vertical, legend=legend, plot_sus=True)
-        ax_re.set_ylabel("$\\varepsilon_\\mathregular{{eff}}'$")
-        ax_im.set_ylabel("$\\varepsilon_\\mathregular{{eff}}''$")
-        
+        fig, (ax_re, ax_im) = super(ProcessedPowder, self).plot(figsize=figsize, vertical=vertical, legend=legend, plot_sus=True)
         return fig, (ax_re, ax_im)
-    
-    def shift(self, amount):
-        inds = self.get_inds(self.EPSRE_IND)
-        self.data[:, inds] = self.data[:, inds] + amount
-
-    def converge(self):
-        minimums = self.get_real_susceptibilities().min(axis=0)
-        central_min = minimums[1]
-        shifter = central_min - minimums
-        # print("shifted real parth with", shifter)
-        self.shift(shifter)
-        return shifter
 
 
 class Unsorted(File):
