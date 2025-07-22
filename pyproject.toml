@@ -27,6 +27,8 @@ dependencies = [
     "scipy",
     "matplotlib",
     "toml",
+    "ipykernel",
+    "ipympl",
 ]
 readme = "README.md"
 license = { text = "GPL" }
